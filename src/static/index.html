@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6 Player Game</title>
+    <style>
+        :root {
+            --card-bg: #2c3e50;
+            --card-text: #ffffff;
+            --control-bg: #f5f5f5;
+            --button-bg: #3498db;
+            --button-text: #ffffff;
+            --card-radius: 8px;
+            --hover-scale: 1.5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: Arial, sans-serif;
+        }
+
+        .game-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .table-area {
+            flex: 1;
+            position: relative;
+            min-height: 55vh;
+        }
+
+        /*.player-card {*/
+        /*    position: absolute;*/
+        /*    width: 15%;*/
+        /*    aspect-ratio: 2 / 3;*/
+        /*    background: var(--card-bg);*/
+        /*    color: var(--card-text);*/
+        /*    padding: 15px;*/
+        /*    border-radius: var(--card-radius);*/
+        /*    text-align: center;*/
+        /*    transform-origin: center center;*/
+        /*    transition: transform 0.3s ease-in-out;*/
+        /*    z-index: 1;*/
+        /*}*/
+
+        .player-card {
+            position: absolute;
+            width: 15%;
+            aspect-ratio: 2 / 3;
+            background: var(--card-bg);
+            color: var(--card-text);
+            padding: 15px;
+            border-radius: var(--card-radius);
+            text-align: center;
+            transform-origin: center center;
+            transition: transform 0.3s ease-in-out;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            /*position: relative;*/
+            overflow: hidden;
+            background-size: cover;
+            background-position: center;
+        }
+
+
+        /* Gradient overlay */
+        .player-card::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60%;
+            background: linear-gradient(
+                    to bottom,
+                    transparent,
+                    rgba(0, 0, 0, 1)
+            );
+            pointer-events: none;
+        }
+
+        .player-card:hover {
+            z-index: 2;
+        }
+        .player-card h2 {
+            font-size: 1rem;
+            margin-bottom: 10px;
+            word-break: break-word;
+            position: relative;
+            z-index: 1;
+        }
+
+        .player-value {
+            font-size: 2rem;
+            font-weight: bold;
+            position: relative;
+            z-index: 1;
+        }
+
+        /*.player-card h2 {*/
+        /*    font-size: 1rem;*/
+        /*    margin-bottom: 10px;*/
+        /*    word-break: break-word;*/
+        /*}*/
+
+        /*.player-value {*/
+        /*    font-size: 2rem;*/
+        /*    font-weight: bold;*/
+        /*}*/
+
+        .controls-area {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            gap: 20px;
+            padding: 20px;
+            background: var(--control-bg);
+            border-radius: var(--card-radius);
+        }
+
+        .player-controls {
+            display: flex;
+            flex-direction: column;
+            /*gap: 10px;*/
+            width: 100%;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: var(--card-radius);
+        }
+
+        .player-controls label {
+            font-weight: bold;
+        }
+
+        .player-controls input,
+        .player-controls select {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: var(--card-radius);
+        }
+
+        .reveal-button {
+            grid-column: 1 / -1;
+            padding: 15px;
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            border-radius: var(--card-radius);
+            cursor: pointer;
+            font-size: 1.1rem;
+        }
+
+        .reveal-button:hover {
+            opacity: 0.9;
+        }
+
+        /* Unique background images for each card */
+        .player-card:nth-child(1) { background-image: url('https://picsum.photos/220/330'); }
+        .player-card:nth-child(2) { background-image: url('https://picsum.photos/221/330'); }
+        .player-card:nth-child(3) { background-image: url('https://picsum.photos/222/330'); }
+        .player-card:nth-child(4) { background-image: url('https://picsum.photos/223/330'); }
+        .player-card:nth-child(5) { background-image: url('https://picsum.photos/224/330'); }
+        .player-card:nth-child(6) { background-image: url('https://picsum.photos/225/330'); }
+
+
+        /*Position of cards for table in large screens*/
+        @media (min-width: 768px) {
+            .player-card:nth-child(1) { top: 50%; left: 0; transform: translate(-0%, -50%); }
+            .player-card:nth-child(2) { top: 15%; left: 18%; transform: translate(-15%, -15%); }
+            .player-card:nth-child(3) { top: 0; left: 50%; transform: translate(-50%, 0); }
+            .player-card:nth-child(4) { top: 15%; right: 18%; transform: translate(15%, -15%); }
+            .player-card:nth-child(5) { top: 50%; right: 0; transform: translate(0%, -50%); }
+            .player-card:nth-child(6) { bottom: 15%; left: 50%; transform: translate(-50%, 0); }
+
+            .player-card:nth-child(1) {
+                top: 50%;
+                left: 0;
+                transform: translate(-0%, -50%);
+            }
+            .player-card:nth-child(1):hover {
+                transform: translate(-0%, -50%) scale(var(--hover-scale));
+            }
+
+            .player-card:nth-child(2) {
+                top: 15%;
+                left: 18%;
+                transform: translate(-15%, -15%);
+            }
+            .player-card:nth-child(2):hover {
+                transform: translate(-15%, -15%) scale(var(--hover-scale));
+            }
+
+            .player-card:nth-child(3) {
+                top: 0;
+                left: 50%;
+                transform: translate(-50%, 0);
+            }
+            .player-card:nth-child(3):hover {
+                transform: translate(-50%, 0) scale(var(--hover-scale));
+            }
+
+            .player-card:nth-child(4) {
+                top: 15%;
+                right: 18%;
+                transform: translate(15%, -15%);
+            }
+            .player-card:nth-child(4):hover {
+                transform: translate(15%, -15%) scale(var(--hover-scale));
+            }
+
+            .player-card:nth-child(5) {
+                top: 50%;
+                right: 0;
+                transform: translate(0%, -50%);
+            }
+            .player-card:nth-child(5):hover {
+                transform: translate(0%, -50%) scale(var(--hover-scale));
+            }
+
+            .player-card:nth-child(6) {
+                bottom: 15%;
+                left: 50%;
+                transform: translate(-50%, 0);
+            }
+            .player-card:nth-child(6):hover {
+                transform: translate(-50%, 0) scale(var(--hover-scale));
+            }
+
+        }
+
+        @media (max-width: 767px) {
+            .table-area {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+                padding: 20px;
+            }
+
+            .player-card {
+                position: relative;
+                top: auto;
+                left: auto;
+                right: auto;
+                bottom: auto;
+                transform: none;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="game-container">
+    <div>
+        <h1>Model United Nations</h1>
+        <p>Issue</p>
+    </div>
+    <div class="table-area">
+        <div class="player-card">
+            <h2>Player 1</h2>
+            <div class="player-value">?</div>
+        </div>
+        <div class="player-card">
+            <h2>Player 2</h2>
+            <div class="player-value">?</div>
+        </div>
+        <div class="player-card">
+            <h2>Player 3</h2>
+            <div class="player-value">?</div>
+        </div>
+        <div class="player-card">
+            <h2>Player 4</h2>
+            <div class="player-value">?</div>
+        </div>
+        <div class="player-card">
+            <h2>Player 5</h2>
+            <div class="player-value">?</div>
+        </div>
+        <div class="player-card">
+            <h2>Player 6</h2>
+            <div class="player-value">?</div>
+        </div>
+    </div>
+
+    <div class="controls-area">
+        <div class="player-controls">
+            <label for="name1">Player 1 Name</label>
+            <input type="text" id="name1">
+            <label for="value1">Value</label>
+            <select id="value1">
+                <option value="">Select a value</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </select>
+        </div>
+
+        <button class="reveal-button">Reveal All Values</button>
+    </div>
+</div>
+</body>
+</html>
