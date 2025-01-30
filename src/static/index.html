@@ -8,9 +8,10 @@
         :root {
             --card-bg: #2c3e50;
             --card-text: #ffffff;
-            --control-bg: #f5f5f5;
+            --control-bg: #2c3e4f;
             --button-bg: #3498db;
             --button-text: #ffffff;
+            --background: #050f1c;
             --card-radius: 8px;
             --hover-scale: 1.5;
         }
@@ -22,56 +23,48 @@
         }
 
         body {
-            min-height: 100vh;
+            /*min-height: 100vh;*/
+            background-color: var(--background);
             display: flex;
             flex-direction: column;
             font-family: Arial, sans-serif;
         }
 
         .game-container {
-            flex: 1;
             display: flex;
             flex-direction: column;
+            position: absolute;
             padding: 20px;
             gap: 20px;
+            width: 100vw;
+            height: 100vh;
         }
 
         .table-area {
-            flex: 1;
-            position: relative;
-            min-height: 55vh;
+            /*height: 1vh;*/
+            flex-grow: 1;
+            display: flex;
+            /*inset: 0;*/
+            /*position: absolute;*/
+            /*position: relative;*/
         }
 
-        /*.player-card {*/
-        /*    position: absolute;*/
-        /*    width: 15%;*/
-        /*    aspect-ratio: 2 / 3;*/
-        /*    background: var(--card-bg);*/
-        /*    color: var(--card-text);*/
-        /*    padding: 15px;*/
-        /*    border-radius: var(--card-radius);*/
-        /*    text-align: center;*/
-        /*    transform-origin: center center;*/
-        /*    transition: transform 0.3s ease-in-out;*/
-        /*    z-index: 1;*/
-        /*}*/
-
         .player-card {
-            position: absolute;
-            width: 15%;
-            aspect-ratio: 2 / 3;
+            position: relative;
+            width: 20vw;
+            height: 20vw;
+            /*aspect-ratio: 2 / 3;*/
             background: var(--card-bg);
             color: var(--card-text);
-            padding: 15px;
+            padding: 0.75rem;
             border-radius: var(--card-radius);
             text-align: center;
             transform-origin: center center;
             transition: transform 0.3s ease-in-out;
-            z-index: 1;
+            margin: 1vw;
             display: flex;
             flex-direction: column;
             justify-content: flex-end;
-            /*position: relative;*/
             overflow: hidden;
             background-size: cover;
             background-position: center;
@@ -96,13 +89,14 @@
 
         .player-card:hover {
             z-index: 2;
+            transform: scale(1.25);
         }
         .player-card h2 {
             font-size: 1rem;
             margin-bottom: 10px;
             word-break: break-word;
             position: relative;
-            z-index: 1;
+            /*z-index: 1;*/
         }
 
         .player-value {
@@ -112,33 +106,36 @@
             z-index: 1;
         }
 
-        /*.player-card h2 {*/
-        /*    font-size: 1rem;*/
-        /*    margin-bottom: 10px;*/
-        /*    word-break: break-word;*/
-        /*}*/
-
-        /*.player-value {*/
-        /*    font-size: 2rem;*/
-        /*    font-weight: bold;*/
-        /*}*/
-
         .controls-area {
             display: flex;
             flex-direction: column;
             width: 100%;
-            gap: 20px;
-            padding: 20px;
+            /*margin: 1rem;*/
+            /*gap: 20px;*/
+            padding: 1rem;
             background: var(--control-bg);
             border-radius: var(--card-radius);
+            align-items: center;
+            box-shadow:
+                    inset 0 0 50px #fff,
+                    inset 20px 0 80px #f0f,
+                    inset -20px 0 80px #0ff,
+                    inset 20px 0 300px #f0f,
+                    inset -20px 0 300px #0ff,
+                    0 0 50px #fff,
+                    -10px 0 80px #f0f,
+                    10px 0 80px #0ff;
         }
 
         .player-controls {
             display: flex;
             flex-direction: column;
-            /*gap: 10px;*/
-            width: 100%;
-            padding: 15px;
+            gap: 0.62rem;
+            width: 75%;
+
+            /*width: 100%;*/
+            padding: 0.5rem;
+            margin: 0.5rem;
             border: 1px solid #ddd;
             border-radius: var(--card-radius);
         }
@@ -163,14 +160,15 @@
             border-radius: var(--card-radius);
             cursor: pointer;
             font-size: 1.1rem;
+            transition: opacity 0.3s ease-in-out;
         }
 
         .reveal-button:hover {
-            opacity: 0.9;
+            opacity: 0.75;
         }
 
         /* Unique background images for each card */
-        .player-card:nth-child(1) { background-image: url('https://picsum.photos/220/330'); }
+        .player-card:nth-child(1) { background-image: url('/static/img/leader1.png'); }
         .player-card:nth-child(2) { background-image: url('https://picsum.photos/221/330'); }
         .player-card:nth-child(3) { background-image: url('https://picsum.photos/222/330'); }
         .player-card:nth-child(4) { background-image: url('https://picsum.photos/223/330'); }
@@ -180,67 +178,10 @@
 
         /*Position of cards for table in large screens*/
         @media (min-width: 768px) {
-            .player-card:nth-child(1) { top: 50%; left: 0; transform: translate(-0%, -50%); }
-            .player-card:nth-child(2) { top: 15%; left: 18%; transform: translate(-15%, -15%); }
-            .player-card:nth-child(3) { top: 0; left: 50%; transform: translate(-50%, 0); }
-            .player-card:nth-child(4) { top: 15%; right: 18%; transform: translate(15%, -15%); }
-            .player-card:nth-child(5) { top: 50%; right: 0; transform: translate(0%, -50%); }
-            .player-card:nth-child(6) { bottom: 15%; left: 50%; transform: translate(-50%, 0); }
-
-            .player-card:nth-child(1) {
-                top: 50%;
-                left: 0;
-                transform: translate(-0%, -50%);
-            }
-            .player-card:nth-child(1):hover {
-                transform: translate(-0%, -50%) scale(var(--hover-scale));
-            }
-
-            .player-card:nth-child(2) {
-                top: 15%;
-                left: 18%;
-                transform: translate(-15%, -15%);
-            }
-            .player-card:nth-child(2):hover {
-                transform: translate(-15%, -15%) scale(var(--hover-scale));
-            }
-
-            .player-card:nth-child(3) {
-                top: 0;
-                left: 50%;
-                transform: translate(-50%, 0);
-            }
-            .player-card:nth-child(3):hover {
-                transform: translate(-50%, 0) scale(var(--hover-scale));
-            }
-
-            .player-card:nth-child(4) {
-                top: 15%;
-                right: 18%;
-                transform: translate(15%, -15%);
-            }
-            .player-card:nth-child(4):hover {
-                transform: translate(15%, -15%) scale(var(--hover-scale));
-            }
-
-            .player-card:nth-child(5) {
-                top: 50%;
-                right: 0;
-                transform: translate(0%, -50%);
-            }
-            .player-card:nth-child(5):hover {
-                transform: translate(0%, -50%) scale(var(--hover-scale));
-            }
-
-            .player-card:nth-child(6) {
-                bottom: 15%;
-                left: 50%;
-                transform: translate(-50%, 0);
-            }
-            .player-card:nth-child(6):hover {
-                transform: translate(-50%, 0) scale(var(--hover-scale));
-            }
-
+            .player-card:nth-child(1) { align-self: flex-end}
+            .player-card:nth-child(2) { align-self: center}
+            .player-card:nth-child(5) { align-self: center}
+            .player-card:nth-child(6) { align-self: flex-end}
         }
 
         @media (max-width: 767px) {
@@ -261,7 +202,38 @@
                 width: 100%;
             }
         }
-    </style>
+
+        .globe {
+            filter: blur(2px);
+            z-index: -1;
+            background:url('/static/img/atlas.png');
+            background-size: cover;
+            /*backdrop-filter: blur(5px);*/
+            animation: movimiento 432s linear 0s infinite;
+            transform:rotateX(6deg) rotateY(6deg) rotateZ(6deg);
+            position: absolute;
+            top: 35vh;
+            /*left: calc(50%);*/
+            left: 1vw;
+            width: 100vw;
+            height: 100vw;
+            border-radius: 50%;
+            box-shadow:
+                    inset 0 0 50px #fff,
+                    inset 20px 0 80px #f0f,
+                    inset -20px 0 80px #0ff,
+                    inset 20px 0 300px #f0f,
+                    inset -20px 0 300px #0ff,
+                    0 0 50px #fff,
+                    -10px 0 80px #f0f,
+                    10px 0 80px #0ff;
+        }
+
+        @keyframes movimiento {
+            0% { background-position:0 951px }
+            100% { background-position:6800px 600px }
+        }
+        </style>
 </head>
 <body>
 <div class="game-container">
@@ -272,7 +244,7 @@
     <div class="table-area">
         <div class="player-card">
             <h2>Player 1</h2>
-            <div class="player-value">?</div>
+            <div class="player-value">1</div>
         </div>
         <div class="player-card">
             <h2>Player 2</h2>
@@ -298,20 +270,25 @@
 
     <div class="controls-area">
         <div class="player-controls">
-            <label for="name1">Player 1 Name</label>
-            <input type="text" id="name1">
-            <label for="value1">Value</label>
-            <select id="value1">
+            <label for="name">Name</label>
+            <input type="text" id="name">
+            <label for="value">Value</label>
+            <select id="value">
                 <option value="">Select a value</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
+                <option value="4">5</option>
+                <option value="5">8</option>
+                <option value="5">13</option>
+                <option value="5">21</option>
             </select>
         </div>
 
         <button class="reveal-button">Reveal All Values</button>
+    </div>
+    <div class="globe" >
+
     </div>
 </div>
 </body>
