@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use warp::ws::{Message, WebSocket};
 use warp::{Filter, Rejection, Reply};
 use futures::{SinkExt, StreamExt};
+use futures::stream::SplitSink;
 use tokio::sync::broadcast;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -22,7 +23,7 @@ struct GameState {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum ClientMessage {
-    ChooseNumber  { player_id: usize, value: u8 },
+    ChangeValue { player_id: usize, value: u8 },
     ChangeName    { player_id: usize, name: String },
     RevealNumbers { value: bool },
 }
@@ -94,12 +95,11 @@ async fn client_connected(
         new_id
     };
 
-    
-    // Notify the client of their assigned player ID
     let msg = serde_json::to_string(&ServerMessage::PlayerAssigned { player_id }).unwrap();
     let _ = ws_tx.send(Message::text(msg)).await;
 
     let game_state_clone = game_state.clone();
+    let _ = tx.send(game_state.lock().unwrap().clone());
 
     tokio::spawn(async move {
         while let Ok(game_state) = rx.recv().await {
@@ -118,38 +118,6 @@ async fn client_connected(
         }
     }
 }
-// 
-// async fn handle_client_message(
-//     message: ClientMessage,
-//     game_state: &SharedGameState,
-//     tx: &broadcast::Sender<GameState>,
-// ) {
-//     let mut state = game_state.lock().unwrap();
-// 
-//     match message {
-//         ClientMessage::ChooseNumber { player_id, number } => {
-//             if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
-//                 if !player.revealed {
-//                     player.number = Some(number);
-// 
-//                     let _ = tx.send(state.clone());
-//                 }
-//             }
-//         }
-//         ClientMessage::RevealNumbers { value } => {
-//             state.all_revealed = value;
-//             for player in &mut state.players {
-//                 if player.number.is_some() {
-//                     player.revealed = value;
-//                 }
-//             }
-//             // Broadcast the updated state
-//             let _ = tx.send(state.clone());
-//         }
-//     }
-// }
-
-
 async fn handle_client_message(
     message: ClientMessage,
     game_state: &SharedGameState,
@@ -159,13 +127,10 @@ async fn handle_client_message(
     let mut state = game_state.lock().unwrap();
 
     match message {
-        ClientMessage::ChooseNumber { player_id, value } => {
+        ClientMessage::ChangeValue { player_id, value } => {
             println!("Player id {} chooses: {}", player_id, value);
-            
             if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
-
-                    player.value = Some(value);
-     
+                player.value = Some(value);
             }
         }
         ClientMessage::ChangeName {player_id, name} => {

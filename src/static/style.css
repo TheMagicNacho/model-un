@@ -192,12 +192,12 @@ p {
 }
 
 /* Unique background images for each card */
-.player-card:nth-child(1) { background-image: url('/static/img/leader1.png'); }
-.player-card:nth-child(2) { background-image: url('/static/img/leader2.png'); }
-.player-card:nth-child(3) { background-image: url('/static/img/leader3.png'); }
-.player-card:nth-child(4) { background-image: url('/static/img/leader4.png'); }
-.player-card:nth-child(5) { background-image: url('/static/img/leader5.png'); }
-.player-card:nth-child(6) { background-image: url('/static/img/leader6.png'); }
+.player-card:nth-child(1) { background-image: url('img/leader1.png'); }
+.player-card:nth-child(2) { background-image: url('img/leader2.png'); }
+.player-card:nth-child(3) { background-image: url('img/leader3.png'); }
+.player-card:nth-child(4) { background-image: url('img/leader4.png'); }
+.player-card:nth-child(5) { background-image: url('img/leader5.png'); }
+.player-card:nth-child(6) { background-image: url('img/leader6.png'); }
 
 
 /*Position of cards for table in large screens*/
@@ -230,7 +230,7 @@ p {
 .globe {
     filter: blur(2px);
     z-index: -1;
-    background:url('/static/img/atlas.png');
+    background:url('img/atlas.png');
     background-size: cover;
     /*backdrop-filter: blur(5px);*/
     animation: rotateglobe 432s linear 0s infinite;

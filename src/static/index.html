@@ -20,17 +20,47 @@
             async run(){
                 const ws = await this.connect_to_server('ws://localhost:3000/ws');
 
-                const nameInput = document.getElementById('player_name');
-                let debounceTimer;
+                const debounce_time = 1;
+                let debounce_timer;
 
-                nameInput.addEventListener('input', () => {
-                    clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(() => {
+                // Add event listener to name input
+                const name_input = document.getElementById('player_name');
+                name_input.addEventListener('input', () => {
+                    clearTimeout(debounce_timer);
+                    debounce_timer = setTimeout(() => {
                         this.handle_name_change(this.local_state, ws);
-                    }, 500);  // 500ms debounce time
+                    }, debounce_time);
+                });
+
+                // Add event listener to value input
+                const value_input = document.getElementById('player_value');
+                value_input.addEventListener('change', () => {
+                    this.handle_value_change(this.local_state, ws);
+                });
+
+                // Add event listener to reveal button
+                const reveal_button = document.getElementById('reveal-button');
+                reveal_button.addEventListener('click', () => {
+                    this.handle_reveal_button_click(this.local_state, ws);
                 });
             }
 
+            handle_reveal_button_click(local_state, ws) {
+                const request = {};
+
+                request.type = "RevealNumbers";
+                request.value = !this.server_state.all_revealed;
+
+                console.log("Sending WebSocket message:", request);
+                ws.send(JSON.stringify(request));
+            }
+            handle_value_change(local_state, ws) {
+                local_state.value = parseInt(document.getElementById('player_value').value);
+                const request = local_state;
+                request.type = "ChangeValue";
+                console.log("Sending WebSocket message:", request);
+                ws.send(JSON.stringify(request));
+            }
             handle_name_change(local_state, ws) {
                 local_state.name = document.getElementById('player_name').value;
                 const request = local_state;
@@ -48,9 +78,17 @@
                     };
 
                     ws.onmessage = (event) => {
-                        this.server_state = JSON.parse(event.data);
-                        console.log("Updated Server State:", this.server_state);
-                        this.update_dom_from_server_state();
+                        const temp_state = JSON.parse(event.data);
+                        console.log("Updated Server State:", temp_state);
+
+                        if (temp_state.type === "PlayerAssigned") {
+                            this.local_state.player_id = temp_state.player_id;
+                        }
+
+                        if (temp_state.type === "UpdateState") {
+                            this.server_state = temp_state;
+                            this.update_dom_from_server_state();
+                        }
                     };
 
                     ws.onerror = (error) => {
@@ -71,14 +109,25 @@
                     // Get elements
                     const player_name_element = document.getElementById(player_name_id);
                     const player_value_element = document.getElementById(player_value_id);
+                    const reveal_button_element = document.getElementById('reveal-button');
 
                     // Check if elements exist before modifying
                     if (player_name_element) {
                         player_name_element.innerHTML = player.player_name;  // Update name
                     }
                     if (player_value_element) {
-                        
-                        player_value_element.innerHTML = player.value ?? "?";  // Update value
+                        if (this.server_state.all_revealed) {
+                            player_value_element.innerHTML = player.value ?? "?";
+                        } else {
+                            player_value_element.innerHTML = "?";
+                        }
+                    }
+                    if (reveal_button_element) {
+                        if (this.server_state.all_revealed) {
+                            reveal_button_element.innerHTML = "Reset";
+                        } else {
+                            reveal_button_element.innerHTML = "Reveal All Values";
+                        }
                     }
                 }
             }
@@ -93,9 +142,8 @@
 <body>
 <div class="game-container">
     <div>
-        <h1>Model United Nations Voting System</h1>
-        <p>Distinguished leader,</p>
-        <p>You are cordulaly invited</p>
+        <h1>Model United Nations Voting</h1>
+        <p>Enter your name and vote. The leader can choose to reveal.</p>
     </div>
     <div class="table-area">
         <div class="player-card">
@@ -134,32 +182,26 @@
                 <p id="player5value">?</p>
             </div>
         </div>
-<!--        <div class="player-card">-->
-<!--            <h2 id="player6name">Player 6</h2>-->
-<!--            <div class="player-value">-->
-<!--                <p id="player6value">?</p>-->
-<!--            </div>-->
-<!--        </div>-->
     </div>
 
     <div class="controls-area">
         <div class="player-controls">
             <label for="player_name">Name</label>
             <input type="text" id="player_name">
-            <label for="value">Vote</label>
-            <select id="value">
+            <label for="player_value">Vote</label>
+            <select id="player_value">
                 <option value="">Select a value</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
-                <option value="4">5</option>
-                <option value="5">8</option>
-                <option value="5">13</option>
-                <option value="5">21</option>
+                <option value="5">5</option>
+                <option value="8">8</option>
+                <option value="13">13</option>
+                <option value="21">21</option>
             </select>
         </div>
 
-        <button class="reveal-button">Reveal All Values</button>
+        <button id="reveal-button" class="reveal-button">Reveal All Values</button>
     </div>
     <div class="globe" >
 
