@@ -8,7 +8,8 @@ use tokio::sync::broadcast;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct PlayerState {
     player_id: usize,
-    number: Option<u8>,
+    player_name: String,
+    value: Option<u8>,
     revealed: bool,
 }
 
@@ -21,7 +22,8 @@ struct GameState {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 enum ClientMessage {
-    ChooseNumber { player_id: usize, number: u8 },
+    ChooseNumber  { player_id: usize, value: u8 },
+    ChangeName    { player_id: usize, name: String },
     RevealNumbers { value: bool },
 }
 
@@ -51,9 +53,6 @@ async fn main() {
         .and(game_state_filter.clone())
         .and(tx_filter.clone())
         .and_then(handle_ws_connection);
-
-    // let static_route = warp::path::end()
-    //     .and(warp::fs::file("./src/static/index.html"));
 
     let static_route = warp::fs::dir("./src/static");
 
@@ -87,17 +86,21 @@ async fn client_connected(
         let new_id = state.players.len();
         state.players.push(PlayerState {
             player_id: new_id,
-            number: None,
+            player_name: "Leader Unknown".to_string(),
+            value: None,
             revealed: false,
         });
+        println!("New client connected: {:?}", state.players[new_id]);
         new_id
     };
 
+    
     // Notify the client of their assigned player ID
     let msg = serde_json::to_string(&ServerMessage::PlayerAssigned { player_id }).unwrap();
     let _ = ws_tx.send(Message::text(msg)).await;
 
     let game_state_clone = game_state.clone();
+
     tokio::spawn(async move {
         while let Ok(game_state) = rx.recv().await {
             let serialized = serde_json::to_string(&ServerMessage::UpdateState(game_state)).unwrap();
@@ -115,27 +118,67 @@ async fn client_connected(
         }
     }
 }
+// 
+// async fn handle_client_message(
+//     message: ClientMessage,
+//     game_state: &SharedGameState,
+//     tx: &broadcast::Sender<GameState>,
+// ) {
+//     let mut state = game_state.lock().unwrap();
+// 
+//     match message {
+//         ClientMessage::ChooseNumber { player_id, number } => {
+//             if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
+//                 if !player.revealed {
+//                     player.number = Some(number);
+// 
+//                     let _ = tx.send(state.clone());
+//                 }
+//             }
+//         }
+//         ClientMessage::RevealNumbers { value } => {
+//             state.all_revealed = value;
+//             for player in &mut state.players {
+//                 if player.number.is_some() {
+//                     player.revealed = value;
+//                 }
+//             }
+//             // Broadcast the updated state
+//             let _ = tx.send(state.clone());
+//         }
+//     }
+// }
+
 
 async fn handle_client_message(
     message: ClientMessage,
     game_state: &SharedGameState,
     tx: &broadcast::Sender<GameState>,
 ) {
+    println!("Client message: {:?}", message);
     let mut state = game_state.lock().unwrap();
 
     match message {
-        ClientMessage::ChooseNumber { player_id, number } => {
+        ClientMessage::ChooseNumber { player_id, value } => {
+            println!("Player id {} chooses: {}", player_id, value);
+            
             if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
-                if !player.revealed {
-                    player.number = Some(number);
-                }
+
+                    player.value = Some(value);
+     
+            }
+        }
+        ClientMessage::ChangeName {player_id, name} => {
+            if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
+                player.player_name = name;
+                println!("Player {} changed to: {}", player_id, player.player_name);
             }
         }
         ClientMessage::RevealNumbers { value } => {
             state.all_revealed = value;
-            
+            println!("Revealing numbers state: {}", value);
             for player in &mut state.players {
-                if player.number.is_some() {
+                if player.value.is_some() {
                     player.revealed = value;
                 }
             }
