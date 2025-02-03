@@ -1,17 +1,19 @@
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use warp::ws::{Message, WebSocket};
 use warp::{Filter, Rejection, Reply};
 use futures::{SinkExt, StreamExt};
 use futures::stream::SplitSink;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
+use tokio::time::{Duration, Instant};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct PlayerState {
     player_id: usize,
     player_name: String,
     value: Option<u8>,
-    revealed: bool,
+    // revealed: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -26,6 +28,7 @@ enum ClientMessage {
     ChangeValue { player_id: usize, value: u8 },
     ChangeName    { player_id: usize, name: String },
     RevealNumbers { value: bool },
+    Pong { player_id: usize },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -34,6 +37,7 @@ enum ServerMessage {
     UpdateState(GameState),
     PlayerAssigned { player_id: usize },
     ErrorMessage(String),
+    Ping{data: usize},
 }
 
 type SharedGameState = Arc<Mutex<GameState>>;
@@ -73,6 +77,20 @@ async fn handle_ws_connection(
     Ok(ws.on_upgrade(move |socket| client_connected(socket, game_state, tx)))
 }
 
+fn calculate_player_id(state: &GameState) -> usize {
+    // if the the players array is 6, then the player id should be increment from 10
+    if state.players.len() == 5 {
+        return 10;
+    }
+
+    // Otherwise, find the lowest unused player ID
+    for i in 0..state.players.len() {
+        if state.players.iter().all(|p| p.player_id != i) {
+            return i;
+        }
+    }
+    state.players.len()
+}
 async fn client_connected(
     websocket: WebSocket,
     game_state: SharedGameState,
@@ -84,12 +102,13 @@ async fn client_connected(
     // Assign a new player ID and add the player to the game state
     let player_id = {
         let mut state = game_state.lock().unwrap();
-        let new_id = state.players.len();
+        let new_id = calculate_player_id(&state);
         state.players.push(PlayerState {
             player_id: new_id,
             player_name: "Leader Unknown".to_string(),
             value: None,
-            revealed: false,
+            // revealed: false,
+            // missed_checkins: 0,
         });
         println!("New client connected: {:?}", state.players[new_id]);
         new_id
@@ -97,27 +116,57 @@ async fn client_connected(
 
     let msg = serde_json::to_string(&ServerMessage::PlayerAssigned { player_id }).unwrap();
     let _ = ws_tx.send(Message::text(msg)).await;
-
     let game_state_clone = game_state.clone();
     let _ = tx.send(game_state.lock().unwrap().clone());
 
-    tokio::spawn(async move {
-        while let Ok(game_state) = rx.recv().await {
-            let serialized = serde_json::to_string(&ServerMessage::UpdateState(game_state)).unwrap();
-            if ws_tx.send(Message::text(serialized)).await.is_err() {
-                break;
+    let ws_task = tokio::spawn(async move {
+        // Regular WebSocket task
+        let mut interval = tokio::time::interval(Duration::from_secs(60)); // Ping every second
+
+        loop {
+            tokio::select! {
+                _ = interval.tick().fuse() => {
+                    let ping_message = serde_json::to_string(&ServerMessage::Ping { data: 0 }).unwrap();
+
+                    if ws_tx.send(Message::text(ping_message)).await.is_err() {
+                        break; // Exit loop if sending fails (client disconnected)
+                    }
+                },
+
+                Ok(game_state) = rx.recv().fuse() => {
+                    let serialized = serde_json::to_string(&ServerMessage::UpdateState(game_state)).unwrap();
+                    if ws_tx.send(Message::text(serialized)).await.is_err() {
+                        break;
+                    }
+                },
+                else => break,
             }
         }
     });
 
-    while let Some(Ok(msg)) = ws_rx.next().await {
-        if let Ok(text) = msg.to_str() {
-            if let Ok(client_message) = serde_json::from_str::<ClientMessage>(text) {
-                handle_client_message(client_message, &game_state_clone, &tx).await;
+    let rx_task = tokio::spawn(async move {
+        // Listen for incoming WebSocket messages
+        while let Some(Ok(msg)) = ws_rx.next().await {
+            if let Ok(text) = msg.to_str() {
+                if let Ok(client_message) = serde_json::from_str::<ClientMessage>(text) {
+                    handle_client_message(client_message, &game_state_clone, &tx).await;
+                }
             }
         }
+    });
+
+    // Wait for either task to finish, ignoring shutdown ordering
+    let _ = tokio::join!(ws_task, rx_task);
+
+    // Clean up after client disconnection
+    // missed_checkins_task.abort(); // Stop the missed check-ins task
+    let mut state = game_state.lock().unwrap();
+    if let Some(index) = state.players.iter().position(|p| p.player_id == player_id) {
+        state.players.remove(index);
+        println!("Player {} disconnected and removed.", player_id);
     }
 }
+
 async fn handle_client_message(
     message: ClientMessage,
     game_state: &SharedGameState,
@@ -127,8 +176,12 @@ async fn handle_client_message(
     let mut state = game_state.lock().unwrap();
 
     match message {
+        ClientMessage::Pong { player_id } => {
+            if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
+                // player.missed_checkins = 0;
+            }
+        }
         ClientMessage::ChangeValue { player_id, value } => {
-            println!("Player id {} chooses: {}", player_id, value);
             if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
                 player.value = Some(value);
             }
@@ -136,17 +189,19 @@ async fn handle_client_message(
         ClientMessage::ChangeName {player_id, name} => {
             if let Some(player) = state.players.iter_mut().find(|p| p.player_id == player_id) {
                 player.player_name = name;
-                println!("Player {} changed to: {}", player_id, player.player_name);
             }
         }
         ClientMessage::RevealNumbers { value } => {
-            state.all_revealed = value;
-            println!("Revealing numbers state: {}", value);
-            for player in &mut state.players {
-                if player.value.is_some() {
-                    player.revealed = value;
+            // Only zero out the values if the user wants to reset and the previous state was reviealed.
+            if value == false && state.all_revealed == true {
+                for player in &mut state.players {
+                    if player.value.is_some() {
+                        player.value = Some(0);
+                    }
                 }
             }
+            // Update the stateddddddd
+            state.all_revealed = value;
         }
     }
 

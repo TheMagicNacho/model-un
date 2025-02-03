@@ -108,6 +108,12 @@ p {
     /*z-index: 1;*/
 }
 
+.player-vacant {
+    filter: grayscale(100%);
+}
+
+
+
 .player-value > p {
     font-size: 2rem;
     font-weight: bold;

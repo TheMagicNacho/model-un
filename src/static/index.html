@@ -20,6 +20,7 @@
             async run(){
                 const ws = await this.connect_to_server('ws://localhost:3000/ws');
 
+                // Debaouncing is used for the field inputs to limit spamming the server.
                 const debounce_time = 1;
                 let debounce_timer;
 
@@ -89,6 +90,13 @@
                             this.server_state = temp_state;
                             this.update_dom_from_server_state();
                         }
+
+                        if (temp_state.type === "Ping") {
+                            ws.send(JSON.stringify({
+                                type: "Pong",
+                                player_id: this.local_state.player_id
+                            }));
+                        }
                     };
 
                     ws.onerror = (error) => {
@@ -97,41 +105,67 @@
                     };
                 });
             }
-
             update_dom_from_server_state() {
-                for (const player_id in this.server_state['players']) {
-                    const player = this.server_state['players'][player_id]; // Get actual player object
+                // Clear all player cards to set them as vacant first
+                for (let i = 0; i < 6; i++) {
+                    const player_card_id = "player" + i + "id";
+                    const player_card_element = document.getElementById(player_card_id);
+                    if (player_card_element) {
+                        player_card_element.classList.add("player-vacant");
 
-                    // Correctly construct element ID
-                    const player_name_id = "player" + player_id + "name";
-                    const player_value_id = "player" + player_id + "value";
-
-                    // Get elements
-                    const player_name_element = document.getElementById(player_name_id);
-                    const player_value_element = document.getElementById(player_value_id);
-                    const reveal_button_element = document.getElementById('reveal-button');
-
-                    // Check if elements exist before modifying
-                    if (player_name_element) {
-                        player_name_element.innerHTML = player.player_name;  // Update name
-                    }
-                    if (player_value_element) {
-                        if (this.server_state.all_revealed) {
-                            player_value_element.innerHTML = player.value ?? "?";
-                        } else {
+                        // Reset the name and value for all cards
+                        const player_name_element = document.getElementById("player" + i + "name");
+                        const player_value_element = document.getElementById("player" + i + "value");
+                        if (player_name_element) {
+                            player_name_element.innerHTML = `Player ${i}`;
+                        }
+                        if (player_value_element) {
                             player_value_element.innerHTML = "?";
                         }
                     }
-                    if (reveal_button_element) {
-                        if (this.server_state.all_revealed) {
-                            reveal_button_element.innerHTML = "Reset";
-                        } else {
-                            reveal_button_element.innerHTML = "Reveal All Values";
+                }
+
+                // Update the player cards based on server state
+                for (const player of this.server_state.players) {
+                    if (player.player_id !== null) {
+                        const player_card_id = "player" + player.player_id + "id";
+                        const player_name_id = "player" + player.player_id + "name";
+                        const player_value_id = "player" + player.player_id + "value";
+
+                        // Get elements
+                        const player_card_element = document.getElementById(player_card_id);
+                        const player_name_element = document.getElementById(player_name_id);
+                        const player_value_element = document.getElementById(player_value_id);
+
+                        if (player_card_element) {
+                            // Mark the card as occupied
+                            player_card_element.classList.remove("player-vacant");
+                        }
+                        if (player_name_element) {
+                            // Update the name
+                            player_name_element.innerHTML = player.player_name ?? `Player ${player.player_id}`;
+                        }
+                        if (player_value_element) {
+                            // Update the value only if revealed
+                            if (this.server_state.all_revealed) {
+                                player_value_element.innerHTML = player.value ?? "?";
+                            } else {
+                                player_value_element.innerHTML = "?";
+                            }
                         }
                     }
                 }
-            }
 
+                // Update the reveal/reset button text
+                const reveal_button_element = document.getElementById('reveal-button');
+                if (reveal_button_element) {
+                    if (this.server_state.all_revealed) {
+                        reveal_button_element.innerHTML = "Reset";
+                    } else {
+                        reveal_button_element.innerHTML = "Reveal";
+                    }
+                }
+            }
         }
         const game = new Game();
         game.run();
@@ -146,37 +180,37 @@
         <p>Enter your name and vote. The leader can choose to reveal.</p>
     </div>
     <div class="table-area">
-        <div class="player-card">
+        <div class="player-card player-vacant" id="player0id">
             <h2 id="player0name">Player 0</h2>
             <div class="player-value">
                 <p id="player0value">?</p>
             </div>
         </div>
-        <div class="player-card">
+        <div class="player-card player-vacant" id="player1id">
             <h2 id="player1name">Player 1</h2>
             <div class="player-value">
                 <p id="player1value">?</p>
             </div>
         </div>
-        <div class="player-card">
+        <div class="player-card player-vacant" id="player2id">
             <h2 id="player2name">Player 2</h2>
             <div class="player-value">
                 <p id="player2value">?</p>
             </div>
         </div>
-        <div class="player-card">
+        <div class="player-card player-vacant" id="player3id">
             <h2 id="player3name">Player 3</h2>
             <div class="player-value">
                 <p id="player3value">?</p>
             </div>
         </div>
-        <div class="player-card">
+        <div class="player-card player-vacant" id="player4id">
             <h2 id="player4name">Player 4</h2>
             <div class="player-value">
                 <p id="player4value">?</p>
             </div>
         </div>
-        <div class="player-card">
+        <div class="player-card player-vacant" id="player5id">
             <h2 id="player5name">Player 5</h2>
             <div class="player-value">
                 <p id="player5value">?</p>
