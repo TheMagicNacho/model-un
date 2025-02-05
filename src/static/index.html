@@ -47,11 +47,14 @@
             }
 
             handle_reveal_button_click(local_state, ws) {
-                const request = {};
+                if (this.server_state.all_revealed) {
+                    // Set the Select to default value
+                    document.getElementById('player_value').value = 0;
+                }
 
+                const request = {};
                 request.type = "RevealNumbers";
                 request.value = !this.server_state.all_revealed;
-
                 console.log("Sending WebSocket message:", request);
                 ws.send(JSON.stringify(request));
             }
@@ -110,9 +113,9 @@
                 for (let i = 0; i < 6; i++) {
                     const player_card_id = "player" + i + "id";
                     const player_card_element = document.getElementById(player_card_id);
-                    if (player_card_element) {
-                        player_card_element.classList.add("player-vacant");
+                    player_card_element.classList.remove("player-ready");
 
+                    if (player_card_element) {
                         // Reset the name and value for all cards
                         const player_name_element = document.getElementById("player" + i + "name");
                         const player_value_element = document.getElementById("player" + i + "value");
@@ -140,6 +143,9 @@
                         if (player_card_element) {
                             // Mark the card as occupied
                             player_card_element.classList.remove("player-vacant");
+                            if (player.value > 0) {
+                                player_card_element.classList.add("player-ready");
+                            }
                         }
                         if (player_name_element) {
                             // Update the name
@@ -148,7 +154,7 @@
                         if (player_value_element) {
                             // Update the value only if revealed
                             if (this.server_state.all_revealed) {
-                                player_value_element.innerHTML = player.value ?? "?";
+                                player_value_element.innerHTML = player.value ? player.value : "?";
                             } else {
                                 player_value_element.innerHTML = "?";
                             }
@@ -224,7 +230,7 @@
             <input type="text" id="player_name">
             <label for="player_value">Vote</label>
             <select id="player_value">
-                <option value="">Select a value</option>
+                <option value="0">Select a value</option>
                 <option value="1">1</option>
                 <option value="2">2</option>
                 <option value="3">3</option>
