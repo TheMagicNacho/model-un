@@ -1,12 +1,13 @@
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use warp::ws::{Message, WebSocket};
 use warp::{Filter, Rejection, Reply};
 use futures::{SinkExt, StreamExt};
 use futures::stream::SplitSink;
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
+use include_dir::{include_dir, Dir};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 struct PlayerState {
@@ -20,6 +21,14 @@ struct PlayerState {
 struct GameState {
     players: Vec<PlayerState>,
     all_revealed: bool,
+    notify_change: NotifyChange,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(PartialEq)]
+struct NotifyChange {
+    current_id: usize,
+    new_id: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,6 +56,7 @@ async fn main() {
     let game_state = SharedGameState::new(Mutex::new(GameState {
         players: Vec::new(),
         all_revealed: false,
+        notify_change: NotifyChange::default(),
     }));
 
     let (tx, _rx) = broadcast::channel(32);
@@ -60,13 +70,13 @@ async fn main() {
         .and_then(handle_ws_connection);
 
     let static_route = warp::fs::dir("./src/static");
-
     let routes = ws_route
-        .or(static_route)
-        .with(warp::cors().allow_any_origin());
+      .or(static_route)
+      .with(warp::cors().allow_any_origin());
 
     println!("Server running on localhost:3000/");
     warp::serve(routes).run(([127, 0, 0, 1], 3000)).await;
+    // warp::serve(routes).run(([0, 0, 0, 0], 3000)).await;
 }
 
 async fn handle_ws_connection(
@@ -78,9 +88,9 @@ async fn handle_ws_connection(
 }
 
 fn calculate_player_id(state: &GameState) -> usize {
-    // if the the players array is 6, then the player id should be increment from 10
-    if state.players.len() == 5 {
-        return 10;
+    // if the players array is 6, then the player id should be increment from 10
+    if state.players.len() >= 6 {
+        return 10 + state.players.len();
     }
 
     // Otherwise, find the lowest unused player ID
@@ -100,7 +110,7 @@ async fn client_connected(
     let mut rx = tx.subscribe();
 
     // Assign a new player ID and add the player to the game state
-    let player_id = {
+    let outgoing_id = {
         let mut state = game_state.lock().unwrap();
         let new_id = calculate_player_id(&state);
         state.players.push(PlayerState {
@@ -110,18 +120,18 @@ async fn client_connected(
             // revealed: false,
             // missed_checkins: 0,
         });
-        println!("New client connected: {:?}", state.players[new_id]);
+        println!("New client connected: {:?}", new_id);
         new_id
     };
 
-    let msg = serde_json::to_string(&ServerMessage::PlayerAssigned { player_id }).unwrap();
+    let msg = serde_json::to_string(&ServerMessage::PlayerAssigned { player_id: outgoing_id }).unwrap();
     let _ = ws_tx.send(Message::text(msg)).await;
     let game_state_clone = game_state.clone();
     let _ = tx.send(game_state.lock().unwrap().clone());
 
     let ws_task = tokio::spawn(async move {
         // Regular WebSocket task
-        let mut interval = tokio::time::interval(Duration::from_secs(60)); // Ping every second
+        let mut interval = tokio::time::interval(Duration::from_secs(5)); // Ping every second
 
         loop {
             tokio::select! {
@@ -161,10 +171,38 @@ async fn client_connected(
     // Clean up after client disconnection
     // missed_checkins_task.abort(); // Stop the missed check-ins task
     let mut state = game_state.lock().unwrap();
-    if let Some(index) = state.players.iter().position(|p| p.player_id == player_id) {
+
+    if let Some(index) = state.players.iter().position(|p| p.player_id == outgoing_id) {
         state.players.remove(index);
-        println!("Player {} disconnected and removed.", player_id);
+        println!("Player {} disconnected and removed.", outgoing_id);
+        let player_in_waiting = find_player_in_waiting(&mut state);
+        match player_in_waiting {
+            Some(player_id) => {
+                state.notify_change = NotifyChange {
+                    current_id: player_id,
+                    new_id: outgoing_id,
+                };
+                println!("Notify Change: {:?}", state);
+            }
+            None => {
+                state.notify_change = NotifyChange {
+                    current_id: 0,
+                    new_id: 0,
+                };
+            }
+        }
     }
+}
+
+fn find_player_in_waiting(state: &mut MutexGuard<GameState>) -> Option<usize> {
+    if state.players.len() >= 6 {
+        for player in &state.players {
+            if player.player_id > 10 {
+                return Some(player.player_id);
+            }
+        }
+    }
+    None
 }
 
 async fn handle_client_message(
