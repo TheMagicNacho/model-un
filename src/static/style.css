@@ -31,6 +31,13 @@ h1 {
   text-align: center;
   font-size: xx-large;
 }
+h2 {
+  color: var(--card-text);
+  text-align: center;
+  font-size: x-large;
+}
+
+
 p {
   color: var(--card-text);
   text-align: center;
