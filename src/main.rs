@@ -4,10 +4,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use warp::ws::{Message, WebSocket};
 use warp::{Filter, Rejection, Reply};
 use futures::{SinkExt, StreamExt};
-use futures::stream::SplitSink;
-use include_dir::{include_dir, Dir};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{Duration, Instant};
+use log::{ info, debug, error, Level};
 
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,8 +51,13 @@ enum ServerMessage {
 
 type SharedGameState = Arc<Mutex<GameState>>;
 
+static PORT: u16 = 3000;
+static BIND_ADDRESS: [u8; 4] = [127, 0, 0, 1];
+
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+    
     let game_state = SharedGameState::new(Mutex::new(GameState {
         players: Vec::new(),
         all_revealed: false,
@@ -71,8 +75,8 @@ async fn main() {
         .and_then(handle_ws_connection);
 
 
-    let static_route = warp::fs::dir("./src/client");
-    
+
+
     let img_route = warp::path("img").and(
         warp::path("portraits.png")
             .and(warp::fs::file("./client/img/portraits.png"))
@@ -80,18 +84,18 @@ async fn main() {
                 .and(warp::fs::file("./client/img/atlas.png"))),
     );
 
-    
+
     let client_code = warp::path("game.js")
         .and(warp::fs::file("./client/game.js"));
-    
+
     let client_style = warp::path("style.css")
         .and(warp::fs::file("./client/style.css"));
-    
+
     let client_html =  warp::path("index.html")
         .and(warp::fs::file("./client/index.html"));
-    
 
-    
+
+
     let routes = ws_route
         // .or(static_route)
         // .or(atlas_route)
@@ -102,9 +106,10 @@ async fn main() {
         .or(client_html)
         .with(warp::cors().allow_any_origin());
 
-    println!("Server running on localhost:3000/");
-    warp::serve(routes).run(([127, 0, 0, 1], 3000)).await;
-    // warp::serve(routes).run(([0, 0, 0, 0], 3000)).await;
+    info!("Model UN Server Running.");
+    // info!("Bind Address: {:?}:{:#?}", BIND_ADDRESS, PORT);
+    warp::serve(routes).run((BIND_ADDRESS, PORT)).await;
+
 }
 
 async fn handle_ws_connection(
@@ -148,7 +153,8 @@ async fn client_connected(
             // revealed: false,
             // missed_checkins: 0,
         });
-        println!("New client connected: {:?}", new_id);
+        // println!("New client connected: {:?}", new_id);
+        info!("New Player ID: {}", new_id);
         new_id
     };
 
@@ -202,7 +208,8 @@ async fn client_connected(
 
     if let Some(index) = state.players.iter().position(|p| p.player_id == outgoing_id) {
         state.players.remove(index);
-        println!("Player {} disconnected and removed.", outgoing_id);
+        // println!("Player {} disconnected and removed.", outgoing_id);
+        info!("Player {} disconnected.", outgoing_id);
         let player_in_waiting = find_player_in_waiting(&mut state);
 
 
@@ -223,7 +230,7 @@ async fn client_connected(
                     current_id: player_id,
                     new_id: outgoing_id,
                 };
-                println!("Notify Change: {:?}", state);
+                debug!("State Change Notification: {:?}", state);
             }
             None => {
                 state.notify_change = NotifyChange {
@@ -251,7 +258,8 @@ async fn handle_client_message(
     game_state: &SharedGameState,
     tx: &broadcast::Sender<GameState>,
 ) {
-    println!("Client message: {:?}", message);
+    // println!("Client message: {:?}", message);
+    debug!("Client message: {:?}", message);
     let mut state = game_state.lock().unwrap();
 
     match message {
@@ -279,10 +287,9 @@ async fn handle_client_message(
                     }
                 }
             }
-            // Update the stateddddddd
+            // Update the state
             state.all_revealed = value;
         }
     }
-
     let _ = tx.send(state.clone());
 }
