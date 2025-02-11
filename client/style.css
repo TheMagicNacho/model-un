@@ -8,6 +8,7 @@
   --card-radius: 8px;
   --hover-scale: 1.5;
   --transition-time: 0.4s;
+  --portrait-offset: 14.4vw;
 }
 
 * {
@@ -65,10 +66,13 @@ p {
 
 .player-card {
   position: relative;
+  /* This represents a 2:3 aspect ratio, but using responsive variables. */
+  /* Avoid adjusting. Made for the sprite sheet. */
   width: 20vw;
-  height: 20vw;
-  /*aspect-ratio: 2 / 3;*/
+  height: 21.591vw;
+
   background: var(--card-bg);
+
   color: var(--card-text);
   padding: 0.75rem;
   border-radius: var(--card-radius);
@@ -80,10 +84,17 @@ p {
   flex-direction: column;
   justify-content: flex-end;
   overflow: hidden;
-  background-size: cover;
-  background-position: center;
   transition: transform var(--transition-time) ease-in-out;
+
+  background-image: url("img/portraits.png");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
 }
+
+
+
+
 
 /* Gradient overlay */
 .player-card::before {
@@ -200,25 +211,6 @@ p {
   /*transition: box-shadow var(--transition-time) ease-in-out;*/
 }
 
-/* Unique background images for each card */
-.player-card:nth-child(1) {
-  background-image: url("img/leader1.png");
-}
-.player-card:nth-child(2) {
-  background-image: url("img/leader2.png");
-}
-.player-card:nth-child(3) {
-  background-image: url("img/leader3.png");
-}
-.player-card:nth-child(4) {
-  background-image: url("img/leader4.png");
-}
-.player-card:nth-child(5) {
-  background-image: url("img/leader5.png");
-}
-.player-card:nth-child(6) {
-  background-image: url("img/leader6.png");
-}
 
 /*Position of cards for table in large screens*/
 @media (min-width: 768px) {
@@ -234,6 +226,34 @@ p {
   .player-card:nth-child(6) {
     align-self: flex-end;
   }
+
+
+  /* Sprite Slicing */
+  .player-card:nth-child(1) {
+    /*background-image: url("img/leader1.png");*/
+    background-position-x: calc(var(--portrait-offset) * 0);;
+  }
+  .player-card:nth-child(2) {
+    /*background-image: url("img/leader2.png");*/
+    background-position-x: calc(var(--portrait-offset) * -1);
+  }
+  .player-card:nth-child(3) {
+    /*background-image: url("img/leader3.png");*/
+    background-position-x: calc(var(--portrait-offset) * -2);
+  }
+  .player-card:nth-child(4) {
+    /*background-image: url("img/leader4.png");*/
+    background-position-x: calc(var(--portrait-offset) * -3);
+  }
+  .player-card:nth-child(5) {
+    /*background-image: url("img/leader5.png");*/
+    background-position-x: calc(var(--portrait-offset) * -4);
+  }
+  .player-card:nth-child(6) {
+    /*background-image: url("img/leader6.png");*/
+    background-position-x: calc(var(--portrait-offset) * -5);
+  }
+
 }
 
 @media (max-width: 767px) {
@@ -252,6 +272,27 @@ p {
     bottom: auto;
     transform: none;
     width: 100%;
+    background-size: 55rem;
+  }
+
+  /* Sprite Slicing */
+  .player-card:nth-child(1) {
+    background-position-x: calc(var(--portrait-offset) * 0);;
+  }
+  .player-card:nth-child(2) {
+    background-position: calc(var(--portrait-offset) * -2.8) -35px;
+  }
+  .player-card:nth-child(3) {
+    background-position: calc(var(--portrait-offset) * -5.5) -45px;
+  }
+  .player-card:nth-child(4) {
+    background-position: calc(var(--portrait-offset) * -8.4) -65px;
+  }
+  .player-card:nth-child(5) {
+    background-position: calc(var(--portrait-offset) * -11) -45px;
+  }
+  .player-card:nth-child(6) {
+    background-position: calc(var(--portrait-offset) * -13.5) -45px;
   }
 }
 

@@ -69,7 +69,9 @@ async fn main() {
         .and(tx_filter.clone())
         .and_then(handle_ws_connection);
 
-    let static_route = warp::fs::dir("./src/static");
+    let site_dir: Dir = include_dir!("./src/client/");
+    // let static_route = warp::fs::dir("./src/client");
+    let static_route = warp::fs::file(site_dir.get_file("index.html").unwrap());
     let routes = ws_route
       .or(static_route)
       .with(warp::cors().allow_any_origin());

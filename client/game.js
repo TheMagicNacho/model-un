@@ -12,7 +12,7 @@ class Game {
     const ws = await this.connect_to_server("ws://localhost:3000/ws");
 
     // Debaouncing is used for the field inputs to limit spamming the server.
-    const debounce_time = 5;
+    const debounce_time = 0;
     let debounce_timer;
 
     // Add event listener to name input
