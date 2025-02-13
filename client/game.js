@@ -9,7 +9,9 @@ class Game {
     };
   }
   async run() {
-    const ws = await this.connect_to_server("ws://localhost:3000/ws");
+    // read the room parameter from the URL
+    const room_name = new URL(window.location.href).searchParams.get("room");
+    const ws = await this.connect_to_server(`ws://localhost:3000/ws/${room_name}`);
 
     // Debaouncing is used for the field inputs to limit spamming the server.
     const debounce_time = 0;
