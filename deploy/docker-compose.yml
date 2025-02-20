@@ -1,0 +1,30 @@
+services:
+  model-un:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: model-un-app
+    restart: unless-stopped
+    networks:
+      - model-un-network
+    expose:
+      - 3000
+    environment:
+      - LOG_LEVEL=info
+
+  nginx:
+    image: nginx:alpine
+    container_name: model-un-deploy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/deploy.conf:/etc/deploy/conf.d/default.conf:ro
+    depends_on:
+      - model-un
+    networks:
+      - model-un-network
+
+networks:
+  model-un-network:
+    driver: bridge
