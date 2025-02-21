@@ -196,7 +196,6 @@ impl Game
     format!("{}{}", adj, animal)
   }
 
-  // update room state
   fn update_room_state(
     &self,
     room: String,
@@ -217,7 +216,6 @@ impl Game
     game_state.get(room).cloned()
   }
 
-  // calculate player id
   fn calculate_player_id(
     &self,
     room: &str,
@@ -233,7 +231,6 @@ impl Game
       },
     };
 
-    // if the players array is 6, then the player id should be increment from 10
     if state.players.len() >= 6
     {
       return 10 + state.players.len();
@@ -270,7 +267,6 @@ impl Game
     player_id
   }
 
-  // Process the client messege, by appropriately updating the game state
   pub async fn process_client_message(
     &self,
     room: &str,
@@ -379,7 +375,7 @@ mod test
     let game = Game::instance();
     let room = game.generate_new_room(None);
 
-    println!("Room: {:?}", room);
+    info!("New Room Generated: {:?}", room);
     assert!(room.len() > 6); // the room name is larger than 5 characters
 
     let room_state = game.get_room_state(&room).unwrap();

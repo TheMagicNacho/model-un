@@ -3,7 +3,6 @@ use std::time::Duration;
 use futures::stream::{SplitSink, SplitStream};
 use futures::{FutureExt, SinkExt, StreamExt};
 use log::debug;
-use tokio::sync::broadcast;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::task::JoinHandle;
 use warp::ws::{Message, WebSocket};
@@ -32,9 +31,9 @@ impl GameWebSocket
   }
 
   pub async fn manage_client_connection(
-    websocket: warp::ws::WebSocket,
+    websocket: WebSocket,
     room: String,
-    tx: broadcast::Sender<RoomUpdate>,
+    tx: Sender<RoomUpdate>,
   )
   {
     let game_state = Game::instance();
@@ -63,7 +62,7 @@ impl GameWebSocket
     let _ = ws_tx.send(Message::text(msg)).await;
 
     // Drive the connection
-    // Spawn incomming message task
+    // Spawn incoming message task
     let rx_task = Self::rx_driver(room.clone(), tx, game_state, ws_rx);
 
     // Spawn outgoing message task
@@ -81,7 +80,7 @@ impl GameWebSocket
     mut ws_rx: SplitStream<WebSocket>,
   ) -> JoinHandle<()>
   {
-    let rx_task = tokio::spawn(async move {
+    tokio::spawn(async move {
       while let Some(Ok(msg)) = ws_rx.next().await
       {
         if let Ok(text) = msg.to_str()
@@ -99,8 +98,7 @@ impl GameWebSocket
           }
         }
       }
-    });
-    rx_task
+    })
   }
 
   fn tx_driver(

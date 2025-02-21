@@ -24,11 +24,7 @@ async fn main()
   env_logger::init();
   let game_state = Game::instance();
 
-  // let game_state = Arc::new(Mutex::new(HashMap::new()));
-
   let (tx, _rx) = broadcast::channel::<RoomUpdate>(32);
-  // let game_state_filter = warp::any().map(move || game_state);
-  // let game_state_filter = warp::any().map(move || game.get_global_state());
   let tx_filter = warp::any().map(move || tx.clone());
 
   // if the user goes to the root, generate a room name and redirect them to
