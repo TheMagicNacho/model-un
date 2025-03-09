@@ -11,7 +11,7 @@ class Game {
   async run() {
     // read the room parameter from the URL
     const room_name = new URL(window.location.href).searchParams.get("room");
-    const ws = await this.connect_to_server(`ws://localhost:3000/ws/${room_name}`);
+    const ws = await this.connect_to_server(`ws://${window.location.hostname}:3000/ws/${room_name}`);
 
     // Debaouncing is used for the field inputs to limit spamming the server.
     const debounce_time = 0;
@@ -213,7 +213,7 @@ class Game {
       const control_area = document.getElementById("polymorphic-hud");
       const value_input = document.getElementById("player_value");
       const reveal_button = document.getElementById("reveal-button");
-      const nameInput = document.getElementById("player_name");
+      // const nameInput = document.getElementById("player_name");
       const value_label = document.querySelector('label[for="player_value"]');
 
       if (this.local_state.player_id > 10 ){  // Spectator Mode

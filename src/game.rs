@@ -5,8 +5,8 @@ use std::time::SystemTime;
 use lazy_static::lazy_static;
 use log::{debug, info};
 
-use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
 use crate::SharedGameState;
+use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
 
 pub(crate) struct Game
 {
@@ -45,7 +45,8 @@ impl Game
 
   fn find_player_in_waiting(
     &self,
-    players: &Vec<PlayerState>,
+    // Allowing a vec reference because I do not want an array.
+    #[allow(clippy::ptr_arg)] players: &Vec<PlayerState>,
   ) -> Option<usize>
   {
     if players.len() >= 6
@@ -143,14 +144,11 @@ impl Game
 
     // add the room to the state.
     let mut game_state = self.game_state.lock().unwrap();
-    game_state.insert(
-      room.clone(),
-      GameState {
-        players: Vec::new(),
-        all_revealed: false,
-        notify_change: NotifyChange::default(),
-      },
-    );
+    game_state.insert(room.clone(), GameState {
+      players: Vec::new(),
+      all_revealed: false,
+      notify_change: NotifyChange::default(),
+    });
     room
   }
 
@@ -255,7 +253,7 @@ impl Game
     let player_id = self.calculate_player_id(room);
     let mut room_state = self.get_room_state(room).unwrap();
     room_state.players.push(PlayerState {
-      player_id: player_id,
+      player_id,
       player_name: "Delegate Unknown".to_string(),
       value: None,
     });
@@ -324,7 +322,7 @@ impl Game
       {
         // Only zero out the values if the user wants to reset and the previous
         // state was revealed.
-        if value == false && room_state.all_revealed == true
+        if !value && room_state.all_revealed
         {
           for player in &mut room_state.players
           {
@@ -501,13 +499,10 @@ mod test
 
     // Change the name of a player in waiting
     game
-      .process_client_message(
-        room,
-        ClientMessage::ChangeName {
-          player_id: 16,
-          name: name_of_player.to_string(),
-        },
-      )
+      .process_client_message(room, ClientMessage::ChangeName {
+        player_id: 16,
+        name: name_of_player.to_string(),
+      })
       .await;
 
     // Remove a player
