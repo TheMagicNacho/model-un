@@ -12,6 +12,7 @@ use tokio::sync::broadcast;
 use warp::Filter;
 
 use crate::interface::GameWebSocket;
+use crate::interface::ConnectionPool;
 
 type SharedGameState = Arc<Mutex<HashMap<String, GameState>>>;
 
@@ -24,7 +25,7 @@ async fn main()
   env_logger::init();
   let game_state = Game::instance();
 
-  let (tx, _rx) = broadcast::channel::<RoomUpdate>(32);
+  let (tx, _rx) = broadcast::channel::<RoomUpdate>(64);
   let tx_filter = warp::any().map(move || tx.clone());
 
   // if the user goes to the root, generate a room name and redirect them to
@@ -43,10 +44,13 @@ async fn main()
   // the client is going to send a parameter after the /ws/ route. That
   // parameter is the room name. We need to filter out the room nae and group
   // all connections with the same room name together.
+  let pool_filter = warp::any().map(move || ConnectionPool::new());
+  
   let ws_route = warp::path("ws")
     .and(warp::path::param::<String>())
     .and(warp::ws())
     .and(tx_filter.clone())
+    .and(pool_filter)
     .and_then(GameWebSocket::handle_connection);
 
   let img_route = warp::path("img").and(

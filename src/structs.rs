@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct RoomUpdate
 {
   pub room: String,
