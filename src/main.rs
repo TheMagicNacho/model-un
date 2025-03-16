@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 mod connection_pool;
 mod counter;
 mod game;
@@ -34,8 +33,6 @@ async fn main()
   // if the user goes to the root, generate a room name and redirect them to
   // index.html with the parameter of the room name
   let index_route = warp::path::end().and_then(async move || {
-    // let room_name = generate_room_name();
-    // let room_name = game_state.generate_new_room(None).await;
     let room_name = game_state.random_name_generator().await;
     Ok::<_, warp::Rejection>(warp::redirect(
       warp::http::Uri::from_maybe_shared(format!(

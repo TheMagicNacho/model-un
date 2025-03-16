@@ -148,11 +148,14 @@ impl Game
     };
 
     let mut game_state = self.game_state.write().await;
-    game_state.insert(room_name.clone(), GameState {
-      players: Vec::new(),
-      all_revealed: false,
-      notify_change: NotifyChange::default(),
-    });
+    game_state.insert(
+      room_name.clone(),
+      GameState {
+        players: Vec::new(),
+        all_revealed: false,
+        notify_change: NotifyChange::default(),
+      },
+    );
     debug!("generate_new_room - Room Name: {} - finished", room_name);
     room_name
   }

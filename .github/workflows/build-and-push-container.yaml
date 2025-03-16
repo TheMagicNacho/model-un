@@ -1,12 +1,14 @@
 name: Build and Push Rust Container
 
 on:
-  push:
-    branches: [ main, sandbox-containers ]
-  pull_request:
-    branches: [ main, sandbox-containers ]
-  workflow_dispatch:  # Allows manual triggering
-
+  workflow_run:
+    workflows:
+      - Rust Linting
+    types:
+      - completed
+    branches:
+      - main
+      - latest
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -48,7 +50,6 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
 
-      # Build and push Docker image
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:

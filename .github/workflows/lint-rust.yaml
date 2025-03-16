@@ -2,10 +2,9 @@ name: Rust Linting
 
 on:
   push:
-    branches: [ main, sandbox-containers ]
-  pull_request:
-    branches: [ main, sandbox-containers ]
-  workflow_dispatch:  # Allows manual triggering
+    branches:
+      - "**"
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -16,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
 
