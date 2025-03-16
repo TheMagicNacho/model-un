@@ -1,21 +1,17 @@
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread::available_parallelism;
 use std::time::Duration;
 
 use futures::stream::{SplitSink, SplitStream};
 use futures::{FutureExt, SinkExt, StreamExt};
 use log::{debug, error};
 use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::{Mutex, RwLock, Semaphore, mpsc};
-use tokio::task::JoinHandle;
+use tokio::sync::mpsc;
 use warp::ws::{Message, WebSocket};
-use warp::{Rejection, Reply, Server};
+use warp::{Rejection, Reply};
 
 use crate::connection_pool::ConnectionPool;
 use crate::game::Game;
-use crate::structs::{ClientMessage, GameState, RoomUpdate, ServerMessage};
+use crate::structs::{ClientMessage, RoomUpdate, ServerMessage};
 
 pub(crate) struct GameWebSocket;
 
@@ -47,7 +43,7 @@ impl GameWebSocket
     let game_state = Game::instance();
 
     let (mut ws_tx, ws_rx) = websocket.split();
-    let (sender, mut receiver) = mpsc::channel::<Message>(32);
+    let (sender, _) = mpsc::channel::<Message>(32);
     let rx = tx.subscribe();
 
     pool.add(room.clone(), sender.clone()).await;
@@ -66,11 +62,8 @@ impl GameWebSocket
     let _ = ws_tx.send(Message::text(msg)).await;
 
     // provide the client with the initial state
-    let room_state = match game_state.get_room_state(&room).await
-    {
-      Some(room_state) => room_state,
-      _ => GameState::default(),
-    };
+    let room_state =
+      (game_state.get_room_state(&room).await).unwrap_or_default();
     let msg =
       serde_json::to_string(&ServerMessage::UpdateState(room_state.clone()))
         .unwrap();
@@ -88,7 +81,7 @@ impl GameWebSocket
     .await;
 
     pool.remove(&room, &sender).await;
-    game_state.remove_player(&room, player_id);
+    game_state.remove_player(&room, player_id).await;
   }
 
   async fn connection_driver(

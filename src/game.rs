@@ -1,71 +1,18 @@
 use std::collections::HashMap;
-use std::sync::atomic::{Ordering, AtomicUsize};
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use log::{debug, error, info};
 use tokio::sync::{Mutex, RwLock};
 
 use crate::SharedGameState;
+use crate::counter::Counter;
 use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
-
-
-struct Counter {
-  adjective_index: AtomicUsize,
-  animal_index: AtomicUsize,
-}
-
-impl Counter {
-  fn new() -> Self {
-    Counter {
-      animal_index: AtomicUsize::new(0),
-      adjective_index: AtomicUsize::new(0),
-    }
-  }
-
-  pub fn instance() -> &'static Counter {
-    use lazy_static::lazy_static;
-    lazy_static! {
-            static ref COUNTER: Counter = Counter::new();
-        }
-    &COUNTER
-  }
-
-  pub fn get_fast_index(&self, fast_array_size: usize) -> usize {
-    self.animal_index.fetch_add(1, Ordering::SeqCst);
-    let current = self.animal_index.fetch_add(1, Ordering::SeqCst);
-    if current >= fast_array_size.saturating_sub(1) {
-      self.animal_index.store(0, Ordering::SeqCst);
-    }
-    current % fast_array_size
-  }
-
-  pub fn get_adjective_index(&self, slow_array_size: usize, fast_array_size: usize) -> usize {
-    // Get current animal index
-    let current_animal = self.animal_index.load(Ordering::SeqCst);
-
-    let will_wrap = current_animal + 1 >= fast_array_size;
-
-    let current_index = if will_wrap {
-      let current = self.adjective_index.fetch_add(1, Ordering::SeqCst);
-
-      if current + 1 >= slow_array_size {
-        self.adjective_index.store(0, Ordering::SeqCst);
-      }
-
-      current
-    } else {
-      self.adjective_index.load(Ordering::SeqCst)
-    };
-
-    current_index % slow_array_size
-  }
-}
 
 pub(crate) struct Game
 {
   game_state: SharedGameState,
-  counter: Arc<Mutex<&'static Counter>>
+  counter: Arc<Mutex<&'static Counter>>, // game_time: Arc<Mutex<SystemTime>>,
 }
 
 impl Game
@@ -75,9 +22,10 @@ impl Game
   {
     let game_state: SharedGameState = Arc::new(RwLock::new(HashMap::new()));
     let counter = Arc::new(Mutex::new(Counter::instance()));
+
     Game {
       game_state,
-      counter, 
+      counter,
     }
   }
 
@@ -209,7 +157,7 @@ impl Game
     room_name
   }
 
-  async fn random_name_generator(&self) -> String
+  pub async fn random_name_generator(&self) -> String
   {
     debug!("random_name_generator - entry");
 
@@ -225,12 +173,12 @@ impl Game
     ];
 
     let room_name = {
-        let c = self.counter.lock().await;
-        let ani_index = c.get_fast_index(animals.len());
-        let adj_index = c.get_adjective_index(adjectives.len(), animals.len());
-        format!("{}{}", adjectives[adj_index], animals[ani_index])
-      };
-      
+      let c = self.counter.lock().await;
+      let ani_index = c.get_fast_index(animals.len());
+      let adj_index = c.get_slow_index(adjectives.len(), animals.len());
+      format!("{}{}", adjectives[adj_index], animals[ani_index])
+    };
+
     debug!("random_name_generator - Room Name: {} - finished", room_name);
 
     room_name
@@ -276,7 +224,7 @@ impl Game
           // Find the lowest unused player ID
           (0..state.players.len())
             .find(|&i| state.players.iter().all(|p| p.player_id != i))
-            .unwrap_or_else(|| state.players.len())
+            .unwrap_or(state.players.len())
         }
       },
       None =>
@@ -351,7 +299,6 @@ impl Game
       } =>
       {
         debug!("Player {} ponged.", player_id);
-        return;
       },
       ClientMessage::ChangeValue {
         player_id,

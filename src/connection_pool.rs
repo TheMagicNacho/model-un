@@ -24,8 +24,7 @@ impl ConnectionPool
     sender: mpsc::Sender<Message>,
   )
   {
-    let mut connections = self.connections.write();
-    connections.await.entry(room).or_default().push(sender);
+    self.connections.write().await.entry(room).or_default().push(sender);
   }
 
   pub async fn remove(

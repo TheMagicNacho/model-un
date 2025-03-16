@@ -1,11 +1,12 @@
 #![feature(async_closure)]
 mod connection_pool;
+mod counter;
 mod game;
 mod interface;
 mod structs;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use game::Game;
 use log::info;
@@ -34,7 +35,8 @@ async fn main()
   // index.html with the parameter of the room name
   let index_route = warp::path::end().and_then(async move || {
     // let room_name = generate_room_name();
-    let room_name = game_state.generate_new_room(None).await;
+    // let room_name = game_state.generate_new_room(None).await;
+    let room_name = game_state.random_name_generator().await;
     Ok::<_, warp::Rejection>(warp::redirect(
       warp::http::Uri::from_maybe_shared(format!(
         "/index.html?room={}",
@@ -47,7 +49,7 @@ async fn main()
   // the client is going to send a parameter after the /ws/ route. That
   // parameter is the room name. We need to filter out the room nae and group
   // all connections with the same room name together.
-  let pool_filter = warp::any().map(move || ConnectionPool::new());
+  let pool_filter = warp::any().map(ConnectionPool::new);
 
   let ws_route = warp::path("ws")
     .and(warp::path::param::<String>())
