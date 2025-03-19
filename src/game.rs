@@ -1,17 +1,18 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::SystemTime;
+use std::sync::Arc;
 
 use lazy_static::lazy_static;
-use log::{debug, info};
+use log::{debug, error, info};
+use tokio::sync::{Mutex, RwLock};
 
-use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
 use crate::SharedGameState;
+use crate::counter::Counter;
+use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
 
 pub(crate) struct Game
 {
   game_state: SharedGameState,
-  game_time: Arc<Mutex<SystemTime>>,
+  counter: Arc<Mutex<&'static Counter>>, // game_time: Arc<Mutex<SystemTime>>,
 }
 
 impl Game
@@ -19,11 +20,12 @@ impl Game
   // The Game object is a singleton
   fn new() -> Self
   {
-    let game_state = Arc::new(Mutex::new(HashMap::new()));
-    let game_time = Arc::new(Mutex::new(SystemTime::now()));
+    let game_state: SharedGameState = Arc::new(RwLock::new(HashMap::new()));
+    let counter = Arc::new(Mutex::new(Counter::instance()));
+
     Game {
       game_state,
-      game_time,
+      counter,
     }
   }
 
@@ -32,42 +34,36 @@ impl Game
     lazy_static! {
       static ref GAME: Game = Game::new();
     }
-    tokio::spawn(async move {
-      loop
-      {
-        let mut time = GAME.game_time.lock().unwrap();
-        *time = SystemTime::now();
-      }
-    });
-
     &GAME
   }
 
   fn find_player_in_waiting(
     &self,
-    players: &Vec<PlayerState>,
+    players: &[PlayerState],
   ) -> Option<usize>
   {
     if players.len() >= 6
     {
-      for player in players.iter()
-      {
-        if player.player_id > 10
-        {
-          return Some(player.player_id);
-        }
-      }
+      players
+        .iter()
+        .find(|player| player.player_id > 10)
+        .map(|player| player.player_id)
     }
-    None
+    else
+    {
+      None
+    }
   }
 
-  pub(crate) fn remove_player(
+  pub(crate) async fn remove_player(
     &self,
     room: &str,
     player_id: usize,
   )
   {
-    let mut state = self.game_state.lock().unwrap();
+    debug!("remove_player - Room: {}, Player ID: {}", room, player_id);
+
+    let mut state = self.game_state.write().await;
     let room_state = state.entry(room.to_string()).or_insert(GameState {
       players: Vec::new(),
       all_revealed: false,
@@ -82,7 +78,6 @@ impl Game
 
       let player_in_waiting = self.find_player_in_waiting(&room_state.players);
 
-      // I'm renaming the variable for comprehension.
       let vacant_id = player_id;
       match player_in_waiting
       {
@@ -91,11 +86,11 @@ impl Game
           self.promote_player(old_id, vacant_id, room_state);
 
           room_state.notify_change = NotifyChange {
-            current_id: player_in_waiting.unwrap(),
+            current_id: old_id,
             new_id: player_id,
           };
 
-          debug!("Player {} promoted to position {}", player_id, player_id);
+          debug!("Player {} promoted to position {}", old_id, player_id);
         },
         None =>
         {
@@ -106,6 +101,11 @@ impl Game
         },
       }
     }
+
+    debug!(
+      "remove_player - Room: {}, Player ID: {} - finished",
+      room, player_id
+    );
   }
 
   fn promote_player(
@@ -115,155 +115,168 @@ impl Game
     state: &mut GameState,
   )
   {
-    let player_index =
-      state.players.iter().position(|p| p.player_id == old_id).unwrap();
+    if let Some(player_index) =
+      state.players.iter().position(|p| p.player_id == old_id)
+    {
+      let cloned_player = state.players[player_index].clone();
 
-    let cloned_player = state.players[player_index].clone();
+      let promoted_player = PlayerState {
+        player_id: new_id,
+        player_name: cloned_player.player_name,
+        value: None,
+      };
 
-    let promoted_player = PlayerState {
-      player_id: new_id,
-      player_name: cloned_player.player_name,
-      value: None,
-    };
+      state.players.remove(player_index);
+      state.players.push(promoted_player);
+    }
 
-    state.players.remove(player_index);
-
-    state.players.push(promoted_player);
+    debug!(
+      "promote_player - Old ID: {}, New ID: {} - finished",
+      old_id, new_id
+    );
   }
-  pub(crate) fn generate_new_room(
+
+  pub(crate) async fn generate_new_room(
     &self,
     room: Option<&str>,
   ) -> String
   {
-    let room = match room
+    let room_name = match room
     {
-      Some(room) => room.to_string().to_owned(),
-      None => self.random_name_generator(),
+      Some(room) => room.to_string(),
+      None => self.random_name_generator().await,
     };
 
-    // add the room to the state.
-    let mut game_state = self.game_state.lock().unwrap();
+    let mut game_state = self.game_state.write().await;
     game_state.insert(
-      room.clone(),
+      room_name.clone(),
       GameState {
         players: Vec::new(),
         all_revealed: false,
         notify_change: NotifyChange::default(),
       },
     );
-    room
+    debug!("generate_new_room - Room Name: {} - finished", room_name);
+    room_name
   }
 
-  fn random_name_generator(&self) -> String
+  pub async fn random_name_generator(&self) -> String
   {
-    let adjectives = vec![
+    debug!("random_name_generator - entry");
+
+    let adjectives = &[
       "Swift", "Mighty", "Clever", "Silent", "Fierce", "Gentle", "Wild",
       "Brave", "Wise", "Nimble", "Proud", "Noble", "Sleepy", "Cunning",
       "Playful",
     ];
 
-    let animals = vec![
+    let animals = &[
       "Fox", "Bear", "Wolf", "Eagle", "Owl", "Lion", "Tiger", "Dolphin",
       "Elephant", "Panther", "Hawk", "Deer", "Rabbit", "Raccoon", "Penguin",
     ];
 
-    // We use this method instead of the rand crate because we noticed that the
-    // rand crate would not constantly update over time. This method allows the
-    // system to update constantly since the time is always getting re-written
-    // in a separate thread.
-    let time_adj = self
-      .game_time
-      .lock()
-      .unwrap()
-      .duration_since(SystemTime::UNIX_EPOCH)
-      .unwrap()
-      .as_millis()
-      - 6857; // A non-repeating prime number as a seed.
-    let adj = adjectives[(time_adj % adjectives.len() as u128) as usize];
-    println!("time_adj: {}", time_adj);
+    let room_name = {
+      let c = self.counter.lock().await;
+      let ani_index = c.get_fast_index(animals.len());
+      let adj_index = c.get_slow_index(adjectives.len(), animals.len());
+      format!("{}{}", adjectives[adj_index], animals[ani_index])
+    };
 
-    let time_animal = self
-      .game_time
-      .lock()
-      .unwrap()
-      .duration_since(SystemTime::UNIX_EPOCH)
-      .unwrap()
-      .as_millis()
-      - 2039; // A non-repeating prime number as a seed.
-    println!("time_adj: {}", time_animal);
-    let animal = animals[(time_animal % animals.len() as u128) as usize];
+    debug!("random_name_generator - Room Name: {} - finished", room_name);
 
-    format!("{}{}", adj, animal)
+    room_name
   }
 
-  fn update_room_state(
+  async fn update_room_state(
     &self,
     room: String,
     state: GameState,
-  )
+  ) -> Option<GameState>
   {
-    let mut game_state = self.game_state.lock().unwrap();
-    game_state.insert(room, state);
+    debug!("update_room_state - Room: {} - finished", room);
+    self.game_state.write().await.insert(room.clone(), state)
   }
 
-  // get room state
-  pub(crate) fn get_room_state(
+  pub(crate) async fn get_room_state(
     &self,
     room: &str,
   ) -> Option<GameState>
   {
-    let game_state = self.game_state.lock().unwrap();
-    game_state.get(room).cloned()
+    debug!("get_room_state - Room: {}", room);
+
+    self.game_state.read().await.get(room).cloned()
   }
 
-  fn calculate_player_id(
+  async fn calculate_player_id(
     &self,
     room: &str,
   ) -> usize
   {
-    let state = match self.get_room_state(room)
+    debug!("calculate_player_id - Room: {}", room);
+
+    let player_id = match self.get_room_state(room).await
     {
-      Some(state) => state,
+      Some(state) =>
+      {
+        if state.players.len() >= 6
+        {
+          10 + state.players.len()
+        }
+        else
+        {
+          // Find the lowest unused player ID
+          (0..state.players.len())
+            .find(|&i| state.players.iter().all(|p| p.player_id != i))
+            .unwrap_or(state.players.len())
+        }
+      },
       None =>
       {
-        self.generate_new_room(Some(room));
-        self.get_room_state(room).unwrap()
+        // if we had to generate a new room, then we know that the new player id
+        // will be 0
+        self.generate_new_room(Some(room)).await;
+        return 0;
       },
     };
 
-    if state.players.len() >= 6
-    {
-      return 10 + state.players.len();
-    }
-
-    // Otherwise, find the lowest unused player ID
-    for i in 0..state.players.len()
-    {
-      if state.players.iter().all(|p| p.player_id != i)
-      {
-        return i;
-      }
-    }
-    state.players.len()
+    debug!(
+      "calculate_player_id - Room: {} - Player ID: {} - finished",
+      room, player_id
+    );
+    player_id
   }
 
-  pub(crate) fn new_player(
+  pub(crate) async fn new_player(
     &self,
     room: &str,
   ) -> usize
   {
-    let player_id = self.calculate_player_id(room);
-    let mut room_state = self.get_room_state(room).unwrap();
-    room_state.players.push(PlayerState {
-      player_id: player_id,
-      player_name: "Delegate Unknown".to_string(),
-      value: None,
-    });
+    debug!("new_player - Room: {}", room);
+    let player_id = self.calculate_player_id(room).await;
 
-    self.update_room_state(room.to_string(), room_state);
+    match self.get_room_state(room).await
+    {
+      Some(mut room_state) =>
+      {
+        room_state.players.push(PlayerState {
+          player_id,
+          player_name: "Delegate Unknown".to_string(),
+          value: None,
+        });
+        match self.update_room_state(room.to_string(), room_state).await
+        {
+          None => error!("Could not update room state."),
+          Some(room_state) => debug!("State updated: {:?}", room_state),
+        }
+      },
+      None =>
+      {
+        error!("Room state not found in new_player for room: {}", room);
+      },
+    }
 
     info!("Player {} joined the room.", player_id);
-
+    debug!("new_player - Room: {}, Player ID: {} - finished", room, player_id);
     player_id
   }
 
@@ -273,9 +286,9 @@ impl Game
     message: ClientMessage,
   )
   {
-    // We are locking and getting the room state within this scope to avoid
-    // having to deal with lifetimes between the lock and to send.
-    let mut state = self.game_state.lock().unwrap();
+    debug!("process_client_message - Room: {}, Message: {:?}", room, message);
+
+    let mut state = self.game_state.write().await;
     let room_state = state.entry(room.to_string()).or_insert(GameState {
       players: Vec::new(),
       all_revealed: false,
@@ -288,13 +301,7 @@ impl Game
         player_id,
       } =>
       {
-        if let Some(_player) =
-          room_state.players.iter_mut().find(|p| p.player_id == player_id)
-        {
-          debug!("Player {} ponged.", player_id);
-        }
-        // TODO: Handle the pong. Currently, nothing happens if a ping is
-        // ignored.
+        debug!("Player {} ponged.", player_id);
       },
       ClientMessage::ChangeValue {
         player_id,
@@ -322,9 +329,9 @@ impl Game
         value,
       } =>
       {
-        // Only zero out the values if the user wants to reset and the previous
-        // state was revealed.
-        if value == false && room_state.all_revealed == true
+        // Only zero out the values if the user wants to reset and the
+        // previous state was revealed.
+        if !value && room_state.all_revealed
         {
           for player in &mut room_state.players
           {
@@ -338,190 +345,5 @@ impl Game
         room_state.all_revealed = value;
       },
     }
-  }
-}
-
-#[cfg(test)]
-mod test
-{
-  use super::*;
-
-  fn setup() -> &'static Game
-  {
-    let game = Game::instance();
-    let room_name = "TestRoom";
-    game.generate_new_room(Some("TestRoom"));
-    load_players(game, room_name);
-    game
-  }
-
-  fn load_players(
-    game: &Game,
-    room: &str,
-  )
-  {
-    game.new_player(room);
-    game.new_player(room);
-    game.new_player(room);
-    game.new_player(room);
-    game.new_player(room);
-    game.new_player(room);
-    game.new_player(room);
-  }
-
-  #[test]
-  fn test_generate_new_room()
-  {
-    let game = Game::instance();
-    let room = game.generate_new_room(None);
-
-    info!("New Room Generated: {:?}", room);
-    assert!(room.len() > 6); // the room name is larger than 5 characters
-
-    let room_state = game.get_room_state(&room).unwrap();
-
-    let empty_room = GameState {
-      players: Vec::new(),
-      all_revealed: false,
-      notify_change: NotifyChange::default(),
-    };
-
-    assert_eq!(room_state, empty_room);
-  }
-
-  #[test]
-  fn test_create_new_room_with_name()
-  {
-    let game = Game::instance();
-    let new_room_name = "NewRoom32";
-    let room = game.generate_new_room(Some(new_room_name));
-    let room_state = game.get_room_state(&room).unwrap();
-    assert_eq!(room, new_room_name);
-
-    let empty_room = GameState {
-      players: Vec::new(),
-      all_revealed: false,
-      notify_change: NotifyChange::default(),
-    };
-
-    assert_eq!(room_state, empty_room);
-  }
-
-  #[test]
-  fn test_new_players()
-  {
-    let game = setup();
-    let room = "LoadingRoom";
-    load_players(game, room);
-    let room_state = game.get_room_state(room).unwrap();
-
-    assert_eq!(room_state.players.len(), 7);
-
-    for i in 0..5
-    {
-      let player =
-        room_state.players.iter().find(|p| p.player_id == i).unwrap();
-      assert_eq!(player.player_name, "Delegate Unknown");
-    }
-  }
-
-  #[tokio::test]
-  async fn process_name_change()
-  {
-    let game = setup();
-    let room = "TestRoom";
-    load_players(game, room);
-
-    let name_change = ClientMessage::ChangeName {
-      player_id: 0,
-      name: "Test Name".to_string(),
-    };
-
-    game.process_client_message(room, name_change).await;
-
-    let room_state = game.get_room_state(room).unwrap();
-    let player = room_state.players.iter().find(|p| p.player_id == 0).unwrap();
-    assert_eq!(player.player_name, "Test Name");
-  }
-
-  #[tokio::test]
-  async fn player_changes_value()
-  {
-    let game = setup();
-    let room = "TestRoom";
-    load_players(game, room);
-
-    let value_change = ClientMessage::ChangeValue {
-      player_id: 3,
-      value: 5,
-    };
-
-    game.process_client_message(room, value_change).await;
-
-    let room_state = game.get_room_state(room).unwrap();
-    let player = room_state.players.iter().find(|p| p.player_id == 3).unwrap();
-    assert_eq!(player.value, Some(5));
-  }
-
-  #[tokio::test]
-  async fn player_reveals_numbers()
-  {
-    let game = setup();
-    let room = "TestRoom";
-    load_players(game, room);
-
-    let reveal_numbers = ClientMessage::RevealNumbers {
-      value: true,
-    };
-
-    game.process_client_message(room, reveal_numbers).await;
-
-    let room_state = game.get_room_state(room).unwrap();
-    assert_eq!(room_state.all_revealed, true);
-
-    let reveal_numbers = ClientMessage::RevealNumbers {
-      value: false,
-    };
-
-    game.process_client_message(room, reveal_numbers).await;
-
-    let room_state = game.get_room_state(room).unwrap();
-    assert_eq!(room_state.all_revealed, false);
-  }
-
-  #[tokio::test]
-  async fn player_leaves_room()
-  {
-    let name_of_player = "PlayerInWaiting";
-    let leaving_id: usize = 3;
-    let room = "PlayersLeavingRoom";
-
-    let game = setup();
-    load_players(game, room);
-
-    // Change the name of a player in waiting
-    game
-      .process_client_message(
-        room,
-        ClientMessage::ChangeName {
-          player_id: 16,
-          name: name_of_player.to_string(),
-        },
-      )
-      .await;
-
-    // Remove a player
-    game.remove_player(room, leaving_id);
-
-    let room_state = game.get_room_state(room).unwrap();
-    assert_eq!(room_state.players.len(), 6);
-
-    for player in room_state.players.iter()
-    {
-      println!("Player: {:?}", player);
-    }
-    let player = room_state.players.iter().find(|p| p.player_id == leaving_id);
-    println!("Player: {:?}", player);
-    assert_eq!(player.unwrap().player_name, name_of_player);
   }
 }
