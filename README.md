@@ -5,13 +5,11 @@
 [![Warp](https://img.shields.io/badge/Warp-WebSockets-blue)](https://github.com/seanmonstar/warp)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
-## "Democracy in action: where planning meets diplomacy!"
-
-![Model UN Demo](https://via.placeholder.com/800x400?text=Model+UN+Demo)
-
 ## 🇺🇳 What is Model UN?
 WTF even is a Planning Poker? Poker is a fun card game, not a serious business tool! 🃏
 Model UN is an open-source, real-time consensus-building tool that merges the formality of United Nations proceedings with the practicality of agile planning poker. It offers teams a fun, themed way to estimate story points, prioritize work items, or vote on any team decision that benefits from anonymous input and collective reveal.
+
+Planning poker looks white and sterile and boring, we look cool AF. and We got more than two collors!
 
 Perfect for:
 - Remote sprint planning sessions
@@ -23,10 +21,9 @@ Perfect for:
 ## 🗳️ Features
 
 - **Real-time communication** through WebSockets for instant updates
-- **Anonymous voting** until consensus to reveal
-- **Room-based sessions** - different teams can use separate virtual chambers
+- **Room-based sessions** - different teams can use separate virtual chambers using the url <url>/index.html?room=<WhateverStringYouWant>
 - **Auto-delegation** - spectators automatically fill vacant seats when delegates leave
-- **Fibonacci sequence** voting options (1, 2, 3, 5, 8, 13, 21)
+- **Fibonacci sequence** voting options (1, 2, 3, 5, 8, 13, 21) : In the future I'd like to support more sequences.
 - **Visual indicators** showing which delegates have cast their votes
 - **Confirmation prompts** when revealing with incomplete votes
 - **Reset functionality** for multiple voting rounds
@@ -42,15 +39,15 @@ cd model-un
 2. Start the Rust server:
 ```bash
 # Install Rust if needed (https://rustup.rs/)
-# Install Docker if needed (https://docs.docker.com/get-docker/)
-./deploy/start.sh
+cargo run
 ```
 
 3. Open your browser to `http://localhost:3000`
 
-4. The app will automatically create a new room for you!
+4. The app will automatically create a new room and redirect you to the room!
 
-5. Have friends join a room by navigating to `http://localhost:3000/?room=your-room-name`
+5. Have friends join a room by navigating to `http://URL:3000/index.html?room=your-room-name`
+   - We are assuming that your firewall port is open
 
 5. Begin diplomatic negotiations (aka estimation)!
 
@@ -65,6 +62,7 @@ cd model-un
 
 ### Frontend
 - Vanilla JavaScript client with WebSocket communication
+- Bare bones DOM manipulation BABBBYYY! No frameworks.
 - Clean CSS styling with diplomatic aesthetics
 - Responsive design for various device sizes
 - Low level design with NO external dependencies
@@ -76,22 +74,6 @@ cd model-un
 - Broadcast channels for efficient message distribution
 - Thread-safe shared state with Arc and Mutex
 
-## 🏗️ Project Structure
-
-```
-model-un/
-├── client/
-│   ├── game.js         # Client-side game logic
-│   ├── index.html      # Main HTML interface
-│   ├── style.css       # UI styling
-│   └── img/            # Image assets
-├── src/
-│   ├── main.rs         # Server entry point
-│   ├── game.rs         # Game state management
-│   ├── interface.rs    # WebSocket handler
-│   └── structs.rs      # Data structures
-└── Cargo.toml          # Rust dependencies
-```
 
 ## 🤝 Contributing
 
