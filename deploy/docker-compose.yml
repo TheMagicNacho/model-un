@@ -1,7 +1,6 @@
 services:
   model-un:
-    build:
-      dockerfile: ../Dockerfile
+    image: ghcr.io/themagicnacho/model-un:main
     container_name: model-un-app
     restart: unless-stopped
     networks:
@@ -9,8 +8,7 @@ services:
     expose:
       - 3000
     environment:
-      - LOG_LEVEL=info
-
+      - LOG_LEVEL=debug
   nginx:
     image: nginx:alpine
     container_name: model-un-deploy
@@ -23,7 +21,6 @@ services:
       - model-un
     networks:
       - model-un-network
-
 networks:
   model-un-network:
     driver: bridge
