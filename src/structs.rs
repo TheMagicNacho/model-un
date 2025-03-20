@@ -1,4 +1,7 @@
+use futures::stream::{SplitSink, SplitStream};
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast::{Receiver, Sender};
+use warp::ws::{Message, WebSocket};
 
 #[derive(Clone, Debug)]
 pub struct RoomUpdate
@@ -30,6 +33,7 @@ pub struct NotifyChange
   pub new_id: usize,
 }
 
+// The JSON from the client to the server.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum ClientMessage
@@ -52,6 +56,7 @@ pub enum ClientMessage
   },
 }
 
+// The JSON from the server to the client.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ServerMessage
@@ -66,4 +71,13 @@ pub enum ServerMessage
   {
     data: usize,
   },
+}
+
+// A simple structure to help tidy the connections between functions.
+pub struct ConnectionContext
+{
+  pub tx: Sender<RoomUpdate>,
+  pub rx: Receiver<RoomUpdate>,
+  pub ws_tx: SplitSink<WebSocket, Message>,
+  pub ws_rx: SplitStream<WebSocket>,
 }
