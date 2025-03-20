@@ -6,15 +6,20 @@ class Game {
       player_id: 0,
       name: "",
       value: 0,
+      previous_player_size: 0,
     };
+    // Values must match the server-side values
+    this.max_table_size = 12;
+    this.overflow_index = 100;
   }
+
   async run() {
     // read the room parameter from the URL
     const room_name = new URL(window.location.href).searchParams.get("room");
-    const ws = await this.connect_to_server(`ws://${window.location.hostname}/ws/${room_name}`);
+    const ws = await this.connect_to_server(`ws://${window.location.hostname}:3000/ws/${room_name}`);
 
     // Debaouncing is used for the field inputs to limit spamming the server.
-    const debounce_time = 0;
+    const debounce_time = 10;
     let debounce_timer;
 
     // Add event listener to name input
@@ -50,10 +55,6 @@ class Game {
     }).slice(0, 5);
     const is_missing_votes = active_players.some(obj => obj && typeof obj === 'object' && obj.value < 1);
 
-
-
-
-
     if (this.server_state.all_revealed) {
       // Set the Select to default value
       document.getElementById("player_value").value = 0;
@@ -62,11 +63,10 @@ class Game {
     const request = {};
     request.type = "RevealNumbers";
     request.value = !this.server_state.all_revealed;
-    // console.log("Sending WebSocket message:", request);
 
-    if (is_missing_votes && request.value === true){
+    if (is_missing_votes && request.value === true) {
       const user_confirmed = confirm("Some delegates are missing votes.\nAre you sure you want to reveal?");
-      if (user_confirmed){
+      if (user_confirmed) {
         ws.send(JSON.stringify(request));
       }
     } else {
@@ -74,24 +74,24 @@ class Game {
     }
 
   }
+
   handle_value_change(local_state, ws) {
     local_state.value = parseInt(document.getElementById("player_value").value);
     const request = local_state;
     request.type = "ChangeValue";
-    // console.log("Sending WebSocket message:", request);
     ws.send(JSON.stringify(request));
   }
+
   handle_name_change(local_state, ws) {
     local_state.name = document.getElementById("player_name").value;
     const request = local_state;
     request.type = "ChangeName";
-    // console.log("Sending WebSocket message:", request);
     ws.send(JSON.stringify(request));
   }
+
   async connect_to_server(server_address) {
     return new Promise((resolve, reject) => {
       const ws = new WebSocket(server_address);
-
       ws.onopen = () => {
         console.log("Connected to server");
         resolve(ws);
@@ -99,7 +99,6 @@ class Game {
 
       ws.onmessage = (event) => {
         const temp_state = JSON.parse(event.data);
-        // console.log("Updated Server State:", temp_state);
 
         if (temp_state.type === "PlayerAssigned") {
           this.local_state.player_id = temp_state.player_id;
@@ -108,8 +107,8 @@ class Game {
         if (temp_state.type === "UpdateState") {
           this.server_state = temp_state;
 
-          if (this.local_state.player_id === temp_state.notify_change.current_id){
-            if (temp_state.notify_change.current_id !== temp_state.notify_change.new_id){
+          if (this.local_state.player_id === temp_state.notify_change.current_id) {
+            if (temp_state.notify_change.current_id !== temp_state.notify_change.new_id) {
               console.log("Previous Player ID:", this.local_state.player_id);
               this.local_state.player_id = temp_state.notify_change.new_id;
               console.log("Updated Player ID:", this.local_state.player_id);
@@ -117,15 +116,14 @@ class Game {
             }
           }
           this.update_dom_from_server_state();
-          console.log("Updated Server State:", this.server_state);
         }
 
         if (temp_state.type === "Ping") {
           ws.send(
-            JSON.stringify({
-              type: "Pong",
-              player_id: this.local_state.player_id,
-            }),
+              JSON.stringify({
+                type: "Pong",
+                player_id: this.local_state.player_id,
+              }),
           );
         }
       };
@@ -136,41 +134,76 @@ class Game {
       };
     });
   }
+
   update_dom_from_server_state() {
-    // create a hashmap to quickly determin if a player's id now vacant.
-    const ids = new Set(this.server_state.players.map(p => p.player_id));
+    const current_size = this.server_state.players.length;
 
-    for (let i = 0; i < 6; i++) {
-      const player_card_id = "player" + i + "id";
-      const player_card_element = document.getElementById(player_card_id);
+    const tableArea = document.getElementsByClassName("table-area")[0];
+    if (tableArea &&
+        current_size > 6 &&
+        current_size !== this.local_state.previous_player_size) {
+      tableArea.classList.add('compact');
+    } else {
+      tableArea.classList.remove('compact');
+    }
 
+    for (let i = 0; i < this.max_table_size; i++) {
+      const player_card_element = document.getElementById(`player${i}id`);
+      const player_name_element = document.getElementById(`player${i}name`);
+      const player_value_element = document.getElementById(`player${i}value`);
 
       if (player_card_element) {
+
+        // Hide the second row if less than 6 players
+        if (i >= 6) {
+          if (current_size > 6) {
+            player_card_element.classList.remove('hidden-card');
+          } else {
+            player_card_element.classList.add('hidden-card');
+          }
+        }
+
+        if (current_size > 6) {
+          player_card_element.classList.add('compact');
+        } else {
+          player_card_element.classList.remove('compact');
+        }
+
+        // Reset state for all cards first
         player_card_element.classList.remove("player-ready");
+        player_card_element.classList.add("player-vacant");
 
-        if (!ids.has(i)){
-          player_card_element.classList.add("player-vacant")
-        }
+        // Find if there's a player for this position
+        const player = this.server_state.players.find(p => p.player_id === i);
 
-        // Reset the name and value for all cards
-        const player_name_element = document.getElementById(
-          "player" + i + "name",
-        );
-        const player_value_element = document.getElementById(
-          "player" + i + "value",
-        );
-        if (player_name_element) {
-          player_name_element.innerHTML = `Delegate ${i}`;
-        }
-        if (player_value_element) {
-          player_value_element.innerHTML = "?";
+        if (player) {
+          // Update card with player data
+          player_card_element.classList.remove("player-vacant");
+          if (player.value > 0) {
+            player_card_element.classList.add("player-ready");
+          }
+
+          if (player_name_element) {
+            player_name_element.innerHTML = player.player_name ?? `Player ${i}`;
+          }
+          if (player_value_element) {
+            player_value_element.innerHTML = this.server_state.all_revealed && player.value ? player.value : "?";
+          }
+        } else {
+          // Reset name and value for vacant spots
+          if (player_name_element) {
+            player_name_element.innerHTML = `Delegate ${i}`;
+          }
+          if (player_value_element) {
+            player_value_element.innerHTML = "?";
+          }
         }
       }
     }
 
     // Update the player cards based on server state
     for (const player of this.server_state.players) {
-      if (player.player_id !== null ) {
+      if (player.player_id !== null) {
         const player_card_id = "player" + player.player_id + "id";
         const player_name_id = "player" + player.player_id + "name";
         const player_value_id = "player" + player.player_id + "value";
@@ -190,7 +223,7 @@ class Game {
         if (player_name_element) {
           // Update the name
           player_name_element.innerHTML =
-            player.player_name ?? `Player ${player.player_id}`;
+              player.player_name ?? `Player ${player.player_id}`;
         }
         if (player_value_element) {
           // Update the value only if revealed
@@ -213,10 +246,9 @@ class Game {
       const control_area = document.getElementById("polymorphic-hud");
       const value_input = document.getElementById("player_value");
       const reveal_button = document.getElementById("reveal-button");
-      // const nameInput = document.getElementById("player_name");
       const value_label = document.querySelector('label[for="player_value"]');
 
-      if (this.local_state.player_id > 10 ){  // Spectator Mode
+      if (this.local_state.player_id > this.overflow_index) {  // Spectator Mode
 
         if (control_area) {
           if (value_input) value_input.style.visibility = "hidden";
@@ -224,7 +256,7 @@ class Game {
           if (value_label) value_label.style.visibility = "hidden";
 
           // Create and insert the Spectator Mode message
-          if (!document.getElementById("spectator-message")){
+          if (!document.getElementById("spectator-message")) {
             const spectator_message = document.createElement("div");
             spectator_message.innerHTML = "" +
                 "<h2>Spectator Mode</h2>" +
@@ -241,7 +273,7 @@ class Game {
         if (reveal_button) reveal_button.style.visibility = "visible";
         if (value_label) value_label.style.visibility = "visible";
 
-        if (document.getElementById("spectator-message")){
+        if (document.getElementById("spectator-message")) {
           document.getElementById("spectator-message").remove();
         }
 
@@ -250,5 +282,6 @@ class Game {
 
   }
 }
+
 const game = new Game();
 game.run();
