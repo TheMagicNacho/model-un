@@ -22,7 +22,7 @@ Steps:
 
 
 
-Pacific Islander - Standing infront of a mine of rubies 
+Indian Princess - Standing infront of a mine of rubies 
 Jamacan -  leader of agriculture standing infront of a vast forest of sugar cane
 Ivrory coast African - Building a mighty merchant marine 
 Native american - Leader of a peaceful group infront of 

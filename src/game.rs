@@ -214,13 +214,16 @@ impl Game
   {
     debug!("calculate_player_id - Room: {}", room);
 
+    let max_room_size = 12;
+    let starting_wait_id = 20;
+    
     let player_id = match self.get_room_state(room).await
     {
       Some(state) =>
       {
-        if state.players.len() >= 6
+        if state.players.len() >= max_room_size 
         {
-          10 + state.players.len()
+          starting_wait_id + state.players.len()
         }
         else
         {

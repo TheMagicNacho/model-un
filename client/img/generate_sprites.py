@@ -16,7 +16,10 @@ def crop_center(img, w, h, eye_y_frac=1/3):
     return img.crop(box)
 
 def main():
-    files = sorted([f for f in os.listdir('.') if f.lower().startswith('leader') and f.lower().endswith(('.png','.jpg','.jpeg'))])
+    files = sorted(
+        [f for f in os.listdir('.') if f.lower().startswith('leader') and f.lower().endswith(('.png', '.jpg', '.jpeg'))],
+        key=lambda x: int(''.join(filter(str.isdigit, x.split('.')[0])))
+    )
     portraits = []
     w, h = 600, 900
     processed_count = 0
@@ -28,11 +31,13 @@ def main():
         cropped = crop_center(img, w, h)
         portraits.append(cropped)
     if not portraits: return
+    print(f'Generating: {OUTPUT_FILE}')
     sheet = Image.new('RGBA', (w*len(portraits), h))
     for i, p in enumerate(portraits):
         sheet.paste(p, (i*w, 0))
     sheet.save(OUTPUT_FILE)
-    print(f'Generating {OUTPUT_FILE} complete!')
+    print('Done!')
+
 
 if __name__ == '__main__':
     main()
