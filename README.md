@@ -6,10 +6,12 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
 
 ## 🇺🇳 What is Model UN?
-WTF even is a Planning Poker? Poker is a fun card game, not a serious business tool! 🃏
-Model UN is an open-source, real-time consensus-building tool that merges the formality of United Nations proceedings with the practicality of agile planning poker. It offers teams a fun, themed way to estimate story points, prioritize work items, or vote on any team decision that benefits from anonymous input and collective reveal.
+WTF even is a Planning Poker? Poker is a fun card game, not a serious business tool!
 
-Planning poker looks white and sterile and boring, we look cool AF. and We got more than two collors!
+Model UN is an open-source, real-time consensus-building tool that merges the formality of United Nations proceedings with the practicality of agile planning poker. 
+This game offers teams a fun, themed way to estimate story points, prioritize work items, or vote on any team decision that benefits from anonymous input and collective reveal.
+
+Planning poker looks white and sterile and boring, we look cool AF. and We got more than two colors!
 
 Perfect for:
 - Remote sprint planning sessions
@@ -41,6 +43,7 @@ cd model-un
 # Install Rust if needed (https://rustup.rs/)
 cargo run
 ```
+add `RUST_LOG=<debug | info | warn | error>` to the command above to set the logging level
 
 3. Open your browser to `http://localhost:3000`
 
@@ -51,21 +54,15 @@ cargo run
 
 5. Begin diplomatic negotiations (aka estimation)!
 
-## 🧠 How It Works
-
-1. **Join a Session**: Navigate to the URL with your room parameter
-2. **Enter Your Name**: Identify yourself as an esteemed delegate
-3. **Cast Your Vote**: Select your point estimate from the dropdown
-4. **Reveal or Reset**: Any delegate can call for votes to be revealed or reset for a new round
 
 ## 🔧 Technical Architecture
 
 ### Frontend
-- Vanilla JavaScript client with WebSocket communication
+- Vanilla JavaScript client with WebSocket communication.
 - Bare bones DOM manipulation BABBBYYY! No frameworks.
-- Clean CSS styling with diplomatic aesthetics
-- Responsive design for various device sizes
-- Low level design with NO external dependencies
+- Clean CSS styling with video game like asthetics.
+- Responsive design for various device sizes.
+- Low level design with NO external dependencies.
 
 ### Backend
 - **Rust** server using the **Warp** framework
@@ -84,6 +81,9 @@ The General Assembly welcomes contributions from all nations! Whether you're fix
 3. Commit your changes (`git commit -m 'Resolution: Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+NOTE! Make sure that your PR passes the CI/CD pipeline.
+Run `cargo clippy` and `cargo fmt` to ensure your code is up to the Rust standards.
 
 ### Contribution Ideas
 - Mobile-responsive design improvements

@@ -36,8 +36,7 @@ async fn main()
     let room_name = game_state.random_name_generator().await;
     Ok::<_, warp::Rejection>(warp::redirect(
       warp::http::Uri::from_maybe_shared(format!(
-        "/index.html?room={}",
-        room_name
+        "/index.html?room={room_name}"
       ))
       .unwrap(),
     ))

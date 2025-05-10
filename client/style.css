@@ -1,9 +1,10 @@
 :root {
   --card-bg: #2c3e50;
-  --card-text: #ffffff;
+  --card-text: #fff;
   --control-bg: #2c3e4f;
   --button-bg: #3498db;
-  --button-text: #ffffff;
+  --button-text: #fff;
+  --player-ready-glow: #00ffff;
   --background: #050f1c;
   --card-radius: 8px;
   --hover-scale: 1.5;
@@ -18,7 +19,6 @@
 }
 
 body {
-  /*min-height: 100vh;*/
   background-color: var(--background);
   display: flex;
   height: 100vh;
@@ -27,52 +27,51 @@ body {
   font-family: Arial, sans-serif;
 }
 
-h1 {
+h1, h2, p {
   color: var(--card-text);
   text-align: center;
-  font-size: xx-large;
-}
-h2 {
-  color: var(--card-text);
-  text-align: center;
-  font-size: x-large;
 }
 
+h1 { font-size: xx-large; }
 
-p {
-  color: var(--card-text);
-  text-align: center;
-  font-size: small;
-}
+h2 { font-size: x-large; }
 
+p { font-size: small; }
+
+
+/* =====================
+   GLOBAL GAME 
+   ===================== */
 .game-container {
   display: flex;
   flex-direction: column;
   position: absolute;
   padding: 20px;
-  gap: 20px;
   width: 100vw;
   height: 100vh;
 }
 
 .table-area {
-  /*height: 1vh;*/
   flex-grow: 1;
   display: flex;
-  /*inset: 0;*/
-  /*position: absolute;*/
-  /*position: relative;*/
 }
 
+.table-area.compact {
+  gap: 7.5vw;
+}
+
+
+/* =====================
+   PLAYER CARDS
+   ===================== */
 .player-card {
   position: relative;
   /* This represents a 2:3 aspect ratio, but using responsive variables. */
   /* Avoid adjusting. Made for the sprite sheet. */
-  width: 20vw;
+  width: 14.4vw;
   height: 21.591vw;
 
-  background: var(--card-bg);
-
+  background: var(--card-bg) url("img/portraits.png") center/cover no-repeat;
   color: var(--card-text);
   padding: 0.75rem;
   border-radius: var(--card-radius);
@@ -85,16 +84,25 @@ p {
   justify-content: flex-end;
   overflow: hidden;
   transition: transform var(--transition-time) ease-in-out;
-
-  background-image: url("img/portraits.png");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center;
 }
 
+.player-card.compact {
+  /* This represents a 2:3 aspect ratio, but using responsive variables. */
+  /* Avoid adjusting. Made for the sprite sheet. */
+  --portrait-offset: 8.35vw;
+  width: 8vw;
+  height: 12.5vw;
+}
 
+.card-stack.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 30vw;
+}
 
-
+.player-card.hidden-card{
+  display: none;
+}
 
 /* Gradient overlay */
 .player-card::before {
@@ -117,7 +125,6 @@ p {
   margin-bottom: 0.4vh;
   word-break: break-word;
   position: relative;
-  /*z-index: 1;*/
 }
 
 .player-vacant {
@@ -131,12 +138,14 @@ p {
   z-index: 1;
 }
 
+
+/* =====================
+   CONTROLS
+   ===================== */
 .controls-area {
   display: flex;
   flex-direction: column;
   width: 100%;
-  /*margin: 1rem;*/
-  /*gap: 20px;*/
   padding: 1rem;
   background: var(--control-bg);
   border-radius: var(--card-radius);
@@ -159,7 +168,6 @@ p {
 
 .player-controls input,
 .player-controls select {
-  /*background-color: var(--card-bg);*/
   color: var(--card-bg);
 }
 
@@ -168,13 +176,9 @@ p {
   flex-direction: column;
   gap: 0.62rem;
   width: 75%;
-
-  /*width: 100%;*/
   padding: 0.5rem;
   margin: 0.5rem;
   border: 1px solid #ddd;
-
-  /*box-shadow: 0 0 50px 5px #ddd;*/
   border-radius: var(--card-radius);
 }
 
@@ -197,7 +201,6 @@ p {
   border-radius: var(--card-radius);
   cursor: pointer;
   font-size: 1.1rem;
-  /*opacity: 70%;*/
   background: var(--button-bg);
   transition: background var(--transition-time) ease-in-out;
 }
@@ -207,106 +210,49 @@ p {
 }
 
 .player-ready {
-  box-shadow: 0 0 2rem 0.25rem #00ffff;
-  /*transition: box-shadow var(--transition-time) ease-in-out;*/
+  box-shadow: 0 0 2rem 0.25rem var(--player-ready-glow);
 }
 
 
-/*Position of cards for table in large screens*/
+/* =====================
+   SPRITE SLICING
+   ===================== */
 @media (min-width: 768px) {
-  .player-card:nth-child(1) {
-    align-self: flex-end;
-  }
-  .player-card:nth-child(2) {
-    align-self: center;
-  }
-  .player-card:nth-child(5) {
-    align-self: center;
-  }
-  .player-card:nth-child(6) {
-    align-self: flex-end;
-  }
+  /* Create the the Chevron Pattern*/
+  .card-stack:nth-child(1) { align-self: flex-end; }
+  .card-stack:nth-child(2) { align-self: center; }
+  .card-stack:nth-child(5) { align-self: center; }
+  .card-stack:nth-child(6) { align-self: flex-end; }
 
+  /* First row of cards */
+  .card-stack:nth-child(1) .player-card { background-position-x: calc(var(--portrait-offset) * 0); }
+  .card-stack:nth-child(2) .player-card { background-position-x: calc(var(--portrait-offset) * -1); }
+  .card-stack:nth-child(3) .player-card { background-position-x: calc(var(--portrait-offset) * -2); }
+  .card-stack:nth-child(4) .player-card { background-position-x: calc(var(--portrait-offset) * -3); }
+  .card-stack:nth-child(5) .player-card { background-position-x: calc(var(--portrait-offset) * -4); }
+  .card-stack:nth-child(6) .player-card { background-position-x: calc(var(--portrait-offset) * -5); }
 
-  /* Sprite Slicing */
-  .player-card:nth-child(1) {
-    /*background-image: url("img/leader1.png");*/
-    background-position-x: calc(var(--portrait-offset) * 0);;
-  }
-  .player-card:nth-child(2) {
-    /*background-image: url("img/leader2.png");*/
-    background-position-x: calc(var(--portrait-offset) * -1);
-  }
-  .player-card:nth-child(3) {
-    /*background-image: url("img/leader3.png");*/
-    background-position-x: calc(var(--portrait-offset) * -2);
-  }
-  .player-card:nth-child(4) {
-    /*background-image: url("img/leader4.png");*/
-    background-position-x: calc(var(--portrait-offset) * -3);
-  }
-  .player-card:nth-child(5) {
-    /*background-image: url("img/leader5.png");*/
-    background-position-x: calc(var(--portrait-offset) * -4);
-  }
-  .player-card:nth-child(6) {
-    /*background-image: url("img/leader6.png");*/
-    background-position-x: calc(var(--portrait-offset) * -5);
-  }
-
+  /* Second row of cards */
+  .card-stack:nth-child(1) .player-card:last-child { background-position-x: calc(var(--portrait-offset) * -6); }
+  .card-stack:nth-child(2) .player-card:last-child { background-position-x: calc(var(--portrait-offset) * -7); }
+  .card-stack:nth-child(3) .player-card:last-child { background-position-x: calc(var(--portrait-offset) * -8); }
+  .card-stack:nth-child(4) .player-card:last-child { background-position-x: calc(var(--portrait-offset) * -9); }
+  .card-stack:nth-child(5) .player-card:last-child { background-position-x: calc(var(--portrait-offset) * -10); }
+  .card-stack:nth-child(6) .player-card:last-child { background-position-x: calc(var(--portrait-offset) * -11); }
 }
 
-@media (max-width: 767px) {
-  .table-area {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
-    padding: 20px;
-  }
-
-  .player-card {
-    position: relative;
-    top: auto;
-    left: auto;
-    right: auto;
-    bottom: auto;
-    transform: none;
-    width: 100%;
-    background-size: 55rem;
-  }
-
-  /* Sprite Slicing */
-  .player-card:nth-child(1) {
-    background-position-x: calc(var(--portrait-offset) * 0);;
-  }
-  .player-card:nth-child(2) {
-    background-position: calc(var(--portrait-offset) * -2.8) -35px;
-  }
-  .player-card:nth-child(3) {
-    background-position: calc(var(--portrait-offset) * -5.5) -45px;
-  }
-  .player-card:nth-child(4) {
-    background-position: calc(var(--portrait-offset) * -8.4) -65px;
-  }
-  .player-card:nth-child(5) {
-    background-position: calc(var(--portrait-offset) * -11) -45px;
-  }
-  .player-card:nth-child(6) {
-    background-position: calc(var(--portrait-offset) * -13.5) -45px;
-  }
-}
-
+/* =====================
+   GLOBE
+   ===================== */
 .globe {
   filter: blur(2px);
   z-index: -1;
   background: url("img/atlas.png");
   background-size: cover;
-  /*backdrop-filter: blur(5px);*/
   animation: rotateglobe 432s linear 0s infinite;
   transform: rotateX(6deg) rotateY(6deg) rotateZ(6deg);
   position: absolute;
   top: 37vh;
-  /*left: calc(50%);*/
   left: 1vw;
   width: 100vw;
   height: 100vh;

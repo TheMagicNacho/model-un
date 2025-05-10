@@ -213,14 +213,16 @@ impl Game
   ) -> usize
   {
     debug!("calculate_player_id - Room: {}", room);
+    let max_room_size = 12;
+    let overflow_index = 100;
 
     let player_id = match self.get_room_state(room).await
     {
       Some(state) =>
       {
-        if state.players.len() >= 6
+        if state.players.len() >= max_room_size
         {
-          10 + state.players.len()
+          overflow_index + state.players.len()
         }
         else
         {
