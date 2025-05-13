@@ -2,17 +2,18 @@ services:
   model-un:
     image: ghcr.io/themagicnacho/model-un:main
     container_name: model-un-app
-    restart: unless-stopped
+    restart: always
     networks:
       - model-un-network
     expose:
       - 3000
     environment:
       - LOG_LEVEL=debug
+
   nginx:
     image: nginx:alpine
     container_name: model-un-deploy
-    restart: unless-stopped
+    restart: always
     ports:
       - "80:80"
     volumes:
