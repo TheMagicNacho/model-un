@@ -1,0 +1,19 @@
+{
+  "name": "Model UN Acceptance",
+  "image": "mcr.microsoft.com/devcontainers/rust:1",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Model UN App",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postStartCommand": "cargo build --release && RUST_LOG=info ./target/release/modelun",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer"
+      ]
+    }
+  }
+}
