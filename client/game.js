@@ -49,8 +49,8 @@ class Game {
   handle_reveal_button_click(local_state, ws) {
 
     const active_players = [...this.server_state.players].sort((a, b) => {
-      const idA = a && typeof a === 'object' && a.hasOwnProperty('player_id') ? a.player_id : Infinity; // Handle missing player_id gracefully
-      const idB = b && typeof b === 'object' && b.hasOwnProperty('player_id') ? b.player_id : Infinity;
+      const idA = a && typeof a === 'object' && Object.hasOwn(a, 'player_id') ? a.player_id : Infinity; // Handle missing player_id gracefully
+      const idB = b && typeof b === 'object' && Object.hasOwn(b, 'player_id') ? b.player_id : Infinity;
       return idA - idB;
     }).slice(0, 5);
     const is_missing_votes = active_players.some(obj => obj && typeof obj === 'object' && obj.value < 1);
