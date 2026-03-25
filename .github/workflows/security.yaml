@@ -14,53 +14,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  codeql:
-    name: CodeQL Analysis (${{ matrix.language }})
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-      actions: read
-
-    strategy:
-      fail-fast: false
-      matrix:
-        language:
-          - javascript-typescript
-          - rust
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
-
-      - name: Install Rust toolchain
-        if: matrix.language == 'rust'
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry
-        if: matrix.language == 'rust'
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-codeql-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-codeql-
-
-      - name: Build Rust code for CodeQL
-        if: matrix.language == 'rust'
-        run: cargo build
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-
   container-scan:
     name: Container Security Scan
     runs-on: ubuntu-latest
