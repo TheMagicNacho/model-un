@@ -11,17 +11,6 @@ updates:
       - "rust"
     open-pull-requests-limit: 10
 
-  # JavaScript dependencies
-  - package-ecosystem: "npm"
-    directory: "/client"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    labels:
-      - "dependencies"
-      - "javascript"
-    open-pull-requests-limit: 10
-
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"

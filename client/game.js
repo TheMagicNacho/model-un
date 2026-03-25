@@ -41,19 +41,23 @@ class Game {
     // Add event listener to reveal button
     const reveal_button = document.getElementById("reveal-button");
     reveal_button.addEventListener("click", () => {
-
       this.handle_reveal_button_click(this.local_state, ws);
     });
   }
 
   handle_reveal_button_click(local_state, ws) {
-
-    const active_players = [...this.server_state.players].sort((a, b) => {
-      const idA = a && typeof a === 'object' && Object.hasOwn(a, 'player_id') ? a.player_id : Infinity; // Handle missing player_id gracefully
-      const idB = b && typeof b === 'object' && Object.hasOwn(b, 'player_id') ? b.player_id : Infinity;
-      return idA - idB;
-    }).slice(0, 5);
-    const is_missing_votes = active_players.some(obj => obj && typeof obj === 'object' && obj.value < 1);
+    const active_players = [...this.server_state.players]
+      .sort((a, b) => {
+        const idA =
+          a && typeof a === "object" && Object.hasOwn(a, "player_id") ? a.player_id : Infinity; // Handle missing player_id gracefully
+        const idB =
+          b && typeof b === "object" && Object.hasOwn(b, "player_id") ? b.player_id : Infinity;
+        return idA - idB;
+      })
+      .slice(0, 5);
+    const is_missing_votes = active_players.some(
+      (obj) => obj && typeof obj === "object" && obj.value < 1,
+    );
 
     if (this.server_state.all_revealed) {
       // Set the Select to default value
@@ -65,14 +69,15 @@ class Game {
     request.value = !this.server_state.all_revealed;
 
     if (is_missing_votes && request.value === true) {
-      const user_confirmed = confirm("Some delegates are missing votes.\nAre you sure you want to reveal?");
+      const user_confirmed = confirm(
+        "Some delegates are missing votes.\nAre you sure you want to reveal?",
+      );
       if (user_confirmed) {
         ws.send(JSON.stringify(request));
       }
     } else {
       ws.send(JSON.stringify(request));
     }
-
   }
 
   handle_value_change(local_state, ws) {
@@ -120,10 +125,10 @@ class Game {
 
         if (temp_state.type === "Ping") {
           ws.send(
-              JSON.stringify({
-                type: "Pong",
-                player_id: this.local_state.player_id,
-              }),
+            JSON.stringify({
+              type: "Pong",
+              player_id: this.local_state.player_id,
+            }),
           );
         }
       };
@@ -139,12 +144,10 @@ class Game {
     const current_size = this.server_state.players.length;
 
     const tableArea = document.getElementsByClassName("table-area")[0];
-    if (tableArea &&
-        current_size > 6 &&
-        current_size !== this.local_state.previous_player_size) {
-      tableArea.classList.add('compact');
+    if (tableArea && current_size > 6 && current_size !== this.local_state.previous_player_size) {
+      tableArea.classList.add("compact");
     } else {
-      tableArea.classList.remove('compact');
+      tableArea.classList.remove("compact");
     }
 
     for (let i = 0; i < this.max_table_size; i++) {
@@ -153,20 +156,19 @@ class Game {
       const player_value_element = document.getElementById(`player${i}value`);
 
       if (player_card_element) {
-
         // Hide the second row if less than 6 players
         if (i >= 6) {
           if (current_size > 6) {
-            player_card_element.classList.remove('hidden-card');
+            player_card_element.classList.remove("hidden-card");
           } else {
-            player_card_element.classList.add('hidden-card');
+            player_card_element.classList.add("hidden-card");
           }
         }
 
         if (current_size > 6) {
-          player_card_element.classList.add('compact');
+          player_card_element.classList.add("compact");
         } else {
-          player_card_element.classList.remove('compact');
+          player_card_element.classList.remove("compact");
         }
 
         // Reset state for all cards first
@@ -174,7 +176,7 @@ class Game {
         player_card_element.classList.add("player-vacant");
 
         // Find if there's a player for this position
-        const player = this.server_state.players.find(p => p.player_id === i);
+        const player = this.server_state.players.find((p) => p.player_id === i);
 
         if (player) {
           // Update card with player data
@@ -187,7 +189,8 @@ class Game {
             player_name_element.innerHTML = player.player_name ?? `Player ${i}`;
           }
           if (player_value_element) {
-            player_value_element.innerHTML = this.server_state.all_revealed && player.value ? player.value : "?";
+            player_value_element.innerHTML =
+              this.server_state.all_revealed && player.value ? player.value : "?";
           }
         } else {
           // Reset name and value for vacant spots
@@ -222,8 +225,7 @@ class Game {
         }
         if (player_name_element) {
           // Update the name
-          player_name_element.innerHTML =
-              player.player_name ?? `Player ${player.player_id}`;
+          player_name_element.innerHTML = player.player_name ?? `Player ${player.player_id}`;
         }
         if (player_value_element) {
           // Update the value only if revealed
@@ -248,7 +250,8 @@ class Game {
       const reveal_button = document.getElementById("reveal-button");
       const value_label = document.querySelector('label[for="player_value"]');
 
-      if (this.local_state.player_id > this.overflow_index) {  // Spectator Mode
+      if (this.local_state.player_id > this.overflow_index) {
+        // Spectator Mode
 
         if (control_area) {
           if (value_input) value_input.style.visibility = "hidden";
@@ -258,15 +261,15 @@ class Game {
           // Create and insert the Spectator Mode message
           if (!document.getElementById("spectator-message")) {
             const spectator_message = document.createElement("div");
-            spectator_message.innerHTML = "" +
-                "<h2>Spectator Mode</h2>" +
-                "<p>All the delegate seats are taken.</p>" +
-                "<p>When a current delegate leaves, you will automatically take their seat. In the mean time, feel free to enter your name!</p>";
+            spectator_message.innerHTML =
+              "" +
+              "<h2>Spectator Mode</h2>" +
+              "<p>All the delegate seats are taken.</p>" +
+              "<p>When a current delegate leaves, you will automatically take their seat. In the mean time, feel free to enter your name!</p>";
 
             spectator_message.id = "spectator-message"; // Give it an ID if you need to manipulate it later.
             control_area.appendChild(spectator_message);
           }
-
         }
       } else {
         if (value_input) value_input.style.visibility = "visible";
@@ -276,10 +279,8 @@ class Game {
         if (document.getElementById("spectator-message")) {
           document.getElementById("spectator-message").remove();
         }
-
       }
     }
-
   }
 }
 
