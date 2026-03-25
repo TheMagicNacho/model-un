@@ -186,19 +186,19 @@ class Game {
           }
 
           if (player_name_element) {
-            player_name_element.innerHTML = player.player_name ?? `Player ${i}`;
+            player_name_element.textContent = player.player_name ?? `Player ${i}`;
           }
           if (player_value_element) {
-            player_value_element.innerHTML =
+            player_value_element.textContent =
               this.server_state.all_revealed && player.value ? player.value : "?";
           }
         } else {
           // Reset name and value for vacant spots
           if (player_name_element) {
-            player_name_element.innerHTML = `Delegate ${i}`;
+            player_name_element.textContent = `Delegate ${i}`;
           }
           if (player_value_element) {
-            player_value_element.innerHTML = "?";
+            player_value_element.textContent = "?";
           }
         }
       }
@@ -225,23 +225,23 @@ class Game {
         }
         if (player_name_element) {
           // Update the name
-          player_name_element.innerHTML = player.player_name ?? `Player ${player.player_id}`;
+          player_name_element.textContent = player.player_name ?? `Player ${player.player_id}`;
         }
         if (player_value_element) {
           // Update the value only if revealed
           if (this.server_state.all_revealed) {
-            player_value_element.innerHTML = player.value ? player.value : "?";
+            player_value_element.textContent = player.value ? player.value : "?";
           } else {
-            player_value_element.innerHTML = "?";
+            player_value_element.textContent = "?";
           }
         }
         // Update the reveal/reset button text
         const reveal_button_element = document.getElementById("reveal-button");
         if (reveal_button_element) {
           if (this.server_state.all_revealed) {
-            reveal_button_element.innerHTML = "Reset";
+            reveal_button_element.textContent = "Reset";
           } else {
-            reveal_button_element.innerHTML = "Reveal";
+            reveal_button_element.textContent = "Reveal";
           }
         }
       }
