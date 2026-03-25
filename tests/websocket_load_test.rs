@@ -349,7 +349,7 @@ async fn test_find_maximum_connections()
 
     // Move to next room every `clients_per_room`
     // connections to spread the load.
-    if current_count.is_multiple_of(clients_per_room)
+    if current_count % clients_per_room == 0
     {
       room_index += 1;
     }
