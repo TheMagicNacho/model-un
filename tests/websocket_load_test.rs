@@ -29,10 +29,17 @@ const VOTE_VALUES: &[u8] = &[1, 2, 3, 5, 8, 13, 21];
 async fn start_server() -> SocketAddr
 {
   let (ws_route, _tx) = build_ws_route();
-  let (addr, server_future) = warp::serve(ws_route)
-    .bind_ephemeral(([127, 0, 0, 1], 0u16));
-  tokio::spawn(server_future);
-  // Give the server a moment to bind.
+  let listener =
+    tokio::net::TcpListener::bind(("127.0.0.1", 0u16))
+      .await
+      .expect("failed to bind");
+  let addr = listener
+    .local_addr()
+    .expect("failed to get local addr");
+  tokio::spawn(
+    warp::serve(ws_route).incoming(listener).run(),
+  );
+  // Give the server a moment to start accepting.
   tokio::time::sleep(Duration::from_millis(50)).await;
   addr
 }

@@ -114,19 +114,17 @@ impl GameWebSocket
           msg_result = ws_rx.next() => {
               match msg_result {
                   Some(Ok(msg)) => {
-                      if let Ok(text) = msg.to_str() {
-                          if let Ok(client_message) =
+                      if let Ok(text) = msg.to_str()
+                          && let Ok(client_message) =
                               serde_json::from_str::<ClientMessage>(text)
-                          {
-                              debug!("Client Message: {:?}", client_message);
-                              game_state.process_client_message(&room, client_message).await;
-                              if let Some(room_state) = game_state.get_room_state(&room).await {
-                                  let _ = tx.send(RoomUpdate {
-                                      room: room.to_string(),
-                                      state: room_state.clone(),
-                                  });
-                              }
-
+                      {
+                          debug!("Client Message: {:?}", client_message);
+                          game_state.process_client_message(&room, client_message).await;
+                          if let Some(room_state) = game_state.get_room_state(&room).await {
+                              let _ = tx.send(RoomUpdate {
+                                  room: room.to_string(),
+                                  state: room_state.clone(),
+                              });
                           }
                       }
                   },

@@ -42,11 +42,12 @@ impl Game
     players: &[PlayerState],
   ) -> Option<usize>
   {
-    if players.len() >= 6
+    let active_count = players.iter().filter(|p| p.player_id < 100).count();
+    if active_count < 12
     {
       players
         .iter()
-        .find(|player| player.player_id > 10)
+        .find(|player| player.player_id >= 100)
         .map(|player| player.player_id)
     }
     else
@@ -347,5 +348,331 @@ impl Game
         room_state.all_revealed = value;
       },
     }
+  }
+}
+
+#[cfg(test)]
+mod tests
+{
+  use super::*;
+  use crate::structs::ClientMessage;
+
+  fn new_game() -> Game
+  {
+    Game::new()
+  }
+
+  // ── Room management ──────────────────────────────────────────────────────
+
+  /// Generating a room with a given name stores an empty GameState for that
+  /// name.
+  #[tokio::test]
+  async fn test_generate_new_room_creates_empty_room()
+  {
+    let game = new_game();
+    let name = game.generate_new_room(Some("g-room-1")).await;
+    assert_eq!(name, "g-room-1");
+    let state = game.get_room_state("g-room-1").await.unwrap();
+    assert!(state.players.is_empty());
+    assert!(!state.all_revealed);
+  }
+
+  /// Calling get_room_state for a room that was never created returns None.
+  #[tokio::test]
+  async fn test_get_room_state_returns_none_for_nonexistent_room()
+  {
+    let game = new_game();
+    assert!(game.get_room_state("does-not-exist").await.is_none());
+  }
+
+  /// random_name_generator produces a non-empty string.
+  #[tokio::test]
+  async fn test_random_name_generator_returns_nonempty_string()
+  {
+    let game = new_game();
+    let name = game.random_name_generator().await;
+    assert!(!name.is_empty());
+  }
+
+  // ── Player ID assignment ─────────────────────────────────────────────────
+
+  /// The very first player in a brand-new room receives ID 0.
+  #[tokio::test]
+  async fn test_new_player_in_new_room_gets_id_zero()
+  {
+    let game = new_game();
+    let id = game.new_player("p-room-first").await;
+    assert_eq!(id, 0);
+    let state = game.get_room_state("p-room-first").await.unwrap();
+    assert_eq!(state.players.len(), 1);
+    assert_eq!(state.players[0].player_id, 0);
+  }
+
+  /// Subsequent players receive sequential IDs.
+  #[tokio::test]
+  async fn test_new_player_assigns_sequential_ids()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("p-room-seq")).await;
+    assert_eq!(game.new_player("p-room-seq").await, 0);
+    assert_eq!(game.new_player("p-room-seq").await, 1);
+    assert_eq!(game.new_player("p-room-seq").await, 2);
+  }
+
+  /// After a player is removed the lowest vacant ID is reused.
+  #[tokio::test]
+  async fn test_new_player_reuses_lowest_available_id()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("p-room-reuse")).await;
+    game.new_player("p-room-reuse").await; // id 0
+    game.new_player("p-room-reuse").await; // id 1
+    game.new_player("p-room-reuse").await; // id 2
+    game.remove_player("p-room-reuse", 1).await;
+    // ID 1 is now the lowest vacant slot
+    assert_eq!(game.new_player("p-room-reuse").await, 1);
+  }
+
+  /// New players get an overflow ID (≥ 100) when the room already has 12
+  /// players.
+  #[tokio::test]
+  async fn test_new_player_overflow_id_when_room_full()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("p-room-full")).await;
+    for _ in 0..12
+    {
+      game.new_player("p-room-full").await;
+    }
+    let overflow_id = game.new_player("p-room-full").await;
+    assert!(
+      overflow_id >= 100,
+      "Expected overflow ID ≥ 100, got {overflow_id}"
+    );
+  }
+
+  /// A new player starts with the default name and no value.
+  #[tokio::test]
+  async fn test_new_player_has_default_name_and_no_value()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("p-room-defaults")).await;
+    game.new_player("p-room-defaults").await;
+    let state = game.get_room_state("p-room-defaults").await.unwrap();
+    assert_eq!(state.players[0].player_name, "Delegate Unknown");
+    assert_eq!(state.players[0].value, None);
+  }
+
+  // ── Player removal ───────────────────────────────────────────────────────
+
+  /// Removing a player by ID reduces the player list by one.
+  #[tokio::test]
+  async fn test_remove_player_removes_player()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("r-room-1")).await;
+    game.new_player("r-room-1").await; // id 0
+    game.new_player("r-room-1").await; // id 1
+    game.remove_player("r-room-1", 0).await;
+    let state = game.get_room_state("r-room-1").await.unwrap();
+    assert_eq!(state.players.len(), 1);
+    assert!(state.players.iter().all(|p| p.player_id != 0));
+  }
+
+  /// When 12 active players are present plus a spectating player (ID ≥ 100),
+  /// removing an active player promotes the spectator into the vacant slot.
+  #[tokio::test]
+  async fn test_remove_player_promotes_waiting_player()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("r-room-promote")).await;
+    // Fill 12 active players (IDs 0–11)
+    for _ in 0..12
+    {
+      game.new_player("r-room-promote").await;
+    }
+    // 13th join → spectator with ID ≥ 100
+    let spectator_id = game.new_player("r-room-promote").await;
+    assert!(spectator_id >= 100, "13th player must be a spectator");
+
+    // Remove player 0 (vacancy); spectator should be promoted into slot 0
+    game.remove_player("r-room-promote", 0).await;
+    let state = game.get_room_state("r-room-promote").await.unwrap();
+
+    // Spectator no longer retains its original spectator ID
+    assert!(state.players.iter().all(|p| p.player_id != spectator_id));
+    // Slot 0 is now filled by the promoted player
+    assert!(state.players.iter().any(|p| p.player_id == 0));
+    // notify_change records the promotion
+    assert_eq!(state.notify_change.current_id, spectator_id);
+    assert_eq!(state.notify_change.new_id, 0);
+  }
+
+  /// When fewer than 12 players remain but no spectator exists, no promotion
+  /// occurs.
+  #[tokio::test]
+  async fn test_remove_player_no_promotion_with_small_room()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("r-room-small")).await;
+    game.new_player("r-room-small").await; // id 0
+    game.new_player("r-room-small").await; // id 1
+    game.remove_player("r-room-small", 0).await;
+    let state = game.get_room_state("r-room-small").await.unwrap();
+    // No promotion expected; notify_change should be zeroed
+    assert_eq!(state.notify_change.current_id, 0);
+    assert_eq!(state.notify_change.new_id, 0);
+  }
+
+  // ── Message processing ───────────────────────────────────────────────────
+
+  /// ChangeValue updates the player's stored value.
+  #[tokio::test]
+  async fn test_process_change_value_updates_player_value()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-cv")).await;
+    game.new_player("m-room-cv").await; // id 0
+    game
+      .process_client_message(
+        "m-room-cv",
+        ClientMessage::ChangeValue {
+          player_id: 0,
+          value: 5,
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-cv").await.unwrap();
+    let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+    assert_eq!(player.value, Some(5));
+  }
+
+  /// ChangeName updates the player's display name.
+  #[tokio::test]
+  async fn test_process_change_name_updates_player_name()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-cn")).await;
+    game.new_player("m-room-cn").await; // id 0
+    game
+      .process_client_message(
+        "m-room-cn",
+        ClientMessage::ChangeName {
+          player_id: 0,
+          name: "Alice".to_string(),
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-cn").await.unwrap();
+    let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+    assert_eq!(player.player_name, "Alice");
+  }
+
+  /// RevealNumbers { true } sets all_revealed to true.
+  #[tokio::test]
+  async fn test_process_reveal_numbers_sets_all_revealed()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-rn-show")).await;
+    game
+      .process_client_message(
+        "m-room-rn-show",
+        ClientMessage::RevealNumbers {
+          value: true,
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-rn-show").await.unwrap();
+    assert!(state.all_revealed);
+  }
+
+  /// RevealNumbers { false } after a reveal resets every player's value to 0
+  /// and clears all_revealed.
+  #[tokio::test]
+  async fn test_process_reveal_numbers_false_resets_values()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-rn-hide")).await;
+    game.new_player("m-room-rn-hide").await; // id 0
+    game
+      .process_client_message(
+        "m-room-rn-hide",
+        ClientMessage::ChangeValue {
+          player_id: 0,
+          value: 8,
+        },
+      )
+      .await;
+    game
+      .process_client_message(
+        "m-room-rn-hide",
+        ClientMessage::RevealNumbers {
+          value: true,
+        },
+      )
+      .await;
+    game
+      .process_client_message(
+        "m-room-rn-hide",
+        ClientMessage::RevealNumbers {
+          value: false,
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-rn-hide").await.unwrap();
+    assert!(!state.all_revealed);
+    let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+    assert_eq!(player.value, Some(0));
+  }
+
+  /// RevealNumbers { false } when numbers were never revealed does not reset
+  /// values.
+  #[tokio::test]
+  async fn test_hide_without_prior_reveal_keeps_values()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-rn-noreset")).await;
+    game.new_player("m-room-rn-noreset").await;
+    game
+      .process_client_message(
+        "m-room-rn-noreset",
+        ClientMessage::ChangeValue {
+          player_id: 0,
+          value: 3,
+        },
+      )
+      .await;
+    // Hide without ever revealing – value must stay intact
+    game
+      .process_client_message(
+        "m-room-rn-noreset",
+        ClientMessage::RevealNumbers {
+          value: false,
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-rn-noreset").await.unwrap();
+    let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+    assert_eq!(player.value, Some(3));
+  }
+
+  /// Pong does not alter game state.
+  #[tokio::test]
+  async fn test_process_pong_is_noop()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-pong")).await;
+    game.new_player("m-room-pong").await;
+    let before = game.get_room_state("m-room-pong").await.unwrap();
+    game
+      .process_client_message(
+        "m-room-pong",
+        ClientMessage::Pong {
+          player_id: 0,
+        },
+      )
+      .await;
+    let after = game.get_room_state("m-room-pong").await.unwrap();
+    assert_eq!(before, after);
   }
 }
