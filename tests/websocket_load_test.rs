@@ -225,7 +225,7 @@ async fn simulate_client_activity(
 }
 
 /// Drain remaining server messages and return the last
-/// `GameState` observed. Used after a synchronisation
+/// `GameState` observed. Used after a synchronization
 /// barrier so all clients collect state while every
 /// connection is still open.
 async fn drain_final_state(
@@ -383,7 +383,7 @@ async fn test_minimum_24_concurrent_connections()
       let mut ws = ws;
       let vote_values: &[u8] =
         &[1, 2, 3, 5, 8, 13, 21];
-      let (ok, _mid_state) =
+      let (ok, _) =
         simulate_client_activity(
           &mut ws,
           pid,
