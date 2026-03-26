@@ -4,6 +4,9 @@ mod game;
 mod interface;
 mod structs;
 
+#[cfg(test)]
+mod integration_tests;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
