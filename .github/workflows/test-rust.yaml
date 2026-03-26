@@ -34,4 +34,13 @@ jobs:
             ${{ runner.os }}-cargo-test-
 
       - name: Run tests
-        run: cargo test
+        # -Z unstable-options --report-time requires nightly (installed above)
+        run: cargo test -- -Z unstable-options --report-time 2>&1 | tee test-results.txt
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results.txt
+          retention-days: 30

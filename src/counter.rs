@@ -128,7 +128,8 @@ mod tests
     assert_eq!(counter.get_slow_index(5, 5), 0);
   }
 
-  /// Slow index increments when fast index is at its last position (about to wrap).
+  /// Slow index increments when fast index is at its last position (about to
+  /// wrap).
   #[test]
   fn test_get_slow_index_increments_when_fast_near_wrap()
   {
@@ -155,7 +156,8 @@ mod tests
     let fast_size = 2;
     let slow_size = 2;
 
-    // Cycle 1: fast 0->1; get_slow sees fast=1, will_wrap=(2>=2)=true -> slow: 0 returned, 1 stored
+    // Cycle 1: fast 0->1; get_slow sees fast=1, will_wrap=(2>=2)=true -> slow:
+    // 0 returned, 1 stored
     counter.get_fast_index(fast_size);
     assert_eq!(counter.get_slow_index(slow_size, fast_size), 0);
 

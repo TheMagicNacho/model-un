@@ -20,7 +20,7 @@ use crate::structs::{ClientMessage, GameState, RoomUpdate, ServerMessage};
 /// `main()`.  Each call creates an independent broadcast channel and connection
 /// pool so tests remain isolated from each other.
 fn build_ws_filter(
-  tx: broadcast::Sender<RoomUpdate>,
+  tx: broadcast::Sender<RoomUpdate>
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone
 {
   let tx_filter = warp::any().map(move || tx.clone());
@@ -35,9 +35,8 @@ fn build_ws_filter(
 
 /// Reads the next message from the client, discarding any `Ping` frames that
 /// arrive due to Tokio's interval firing its first tick immediately.
-async fn recv_next_non_ping(
-  client: &mut warp::test::WsClient,
-) -> ServerMessage
+async fn recv_next_non_ping(client: &mut warp::test::WsClient)
+-> ServerMessage
 {
   loop
   {
@@ -47,13 +46,16 @@ async fn recv_next_non_ping(
         .expect("Should deserialize to ServerMessage");
     match server_msg
     {
-      ServerMessage::Ping { .. } => continue,
+      ServerMessage::Ping {
+        ..
+      } => continue,
       other => return other,
     }
   }
 }
 
-// ── Connection handshake ──────────────────────────────────────────────────────
+// ── Connection handshake
+// ──────────────────────────────────────────────────────
 
 /// After the WebSocket handshake the server immediately sends a
 /// `PlayerAssigned` message containing the new player's ID.
@@ -107,7 +109,8 @@ async fn test_connection_receives_initial_state()
   );
 }
 
-/// The initial `UpdateState` includes the connecting player in the players list.
+/// The initial `UpdateState` includes the connecting player in the players
+/// list.
 #[tokio::test]
 async fn test_initial_state_contains_connecting_player()
 {
@@ -125,8 +128,11 @@ async fn test_initial_state_contains_connecting_player()
   {
     match recv_next_non_ping(&mut client).await
     {
-      ServerMessage::PlayerAssigned { player_id } => break player_id,
-      _ => {},
+      ServerMessage::PlayerAssigned {
+        player_id,
+      } => break player_id,
+      _ =>
+      {},
     }
   };
 
@@ -135,7 +141,8 @@ async fn test_initial_state_contains_connecting_player()
     match recv_next_non_ping(&mut client).await
     {
       ServerMessage::UpdateState(s) => break s,
-      _ => {},
+      _ =>
+      {},
     }
   };
 
@@ -145,7 +152,8 @@ async fn test_initial_state_contains_connecting_player()
   );
 }
 
-// ── Client messages ───────────────────────────────────────────────────────────
+// ── Client messages
+// ───────────────────────────────────────────────────────────
 
 /// Reads messages, skipping Pings, until an `UpdateState` is found.
 async fn recv_update_state(client: &mut warp::test::WsClient) -> GameState
@@ -155,7 +163,8 @@ async fn recv_update_state(client: &mut warp::test::WsClient) -> GameState
     match recv_next_non_ping(client).await
     {
       ServerMessage::UpdateState(s) => return s,
-      _ => {},
+      _ =>
+      {},
     }
   }
 }
@@ -165,8 +174,9 @@ async fn recv_player_assigned(client: &mut warp::test::WsClient) -> usize
 {
   loop
   {
-    if let ServerMessage::PlayerAssigned { player_id } =
-      recv_next_non_ping(client).await
+    if let ServerMessage::PlayerAssigned {
+      player_id,
+    } = recv_next_non_ping(client).await
     {
       return player_id;
     }
@@ -264,8 +274,10 @@ async fn test_reveal_numbers_sets_all_revealed_flag()
 
   client
     .send_text(
-      serde_json::to_string(&ClientMessage::RevealNumbers { value: true })
-        .unwrap(),
+      serde_json::to_string(&ClientMessage::RevealNumbers {
+        value: true,
+      })
+      .unwrap(),
     )
     .await;
 
@@ -305,8 +317,10 @@ async fn test_hide_numbers_resets_values()
   // Reveal
   client
     .send_text(
-      serde_json::to_string(&ClientMessage::RevealNumbers { value: true })
-        .unwrap(),
+      serde_json::to_string(&ClientMessage::RevealNumbers {
+        value: true,
+      })
+      .unwrap(),
     )
     .await;
   let _ = recv_update_state(&mut client).await; // UpdateState revealed
@@ -314,8 +328,10 @@ async fn test_hide_numbers_resets_values()
   // Hide – values must be zeroed
   client
     .send_text(
-      serde_json::to_string(&ClientMessage::RevealNumbers { value: false })
-        .unwrap(),
+      serde_json::to_string(&ClientMessage::RevealNumbers {
+        value: false,
+      })
+      .unwrap(),
     )
     .await;
   let state = recv_update_state(&mut client).await;
@@ -350,7 +366,10 @@ async fn test_pong_does_not_change_game_state()
 
   client
     .send_text(
-      serde_json::to_string(&ClientMessage::Pong { player_id }).unwrap(),
+      serde_json::to_string(&ClientMessage::Pong {
+        player_id,
+      })
+      .unwrap(),
     )
     .await;
 
@@ -363,7 +382,8 @@ async fn test_pong_does_not_change_game_state()
   );
 }
 
-// ── Multi-client broadcast ────────────────────────────────────────────────────
+// ── Multi-client broadcast
+// ────────────────────────────────────────────────────
 
 /// When one client sends a message, all clients in the same room receive the
 /// resulting `UpdateState` broadcast.
@@ -423,7 +443,8 @@ async fn test_multiple_clients_receive_state_updates()
   assert_eq!(p2.player_name, "Broadcaster");
 }
 
-// ── HTTP routes ───────────────────────────────────────────────────────────────
+// ── HTTP routes
+// ───────────────────────────────────────────────────────────────
 
 /// `GET /` redirects to `/index.html?room=<name>`.  `warp::redirect` uses
 /// HTTP 301 (Moved Permanently).
@@ -434,17 +455,16 @@ async fn test_index_route_redirects_to_room()
   let index_route = warp::path::end().and_then(async move || {
     let room_name = game_state.random_name_generator().await;
     Ok::<_, warp::Rejection>(warp::redirect(
-      warp::http::Uri::from_maybe_shared(format!("/index.html?room={room_name}"))
-        .unwrap(),
+      warp::http::Uri::from_maybe_shared(format!(
+        "/index.html?room={room_name}"
+      ))
+      .unwrap(),
     ))
   });
   let routes = warp::get().and(index_route);
 
-  let response = warp::test::request()
-    .method("GET")
-    .path("/")
-    .reply(&routes)
-    .await;
+  let response =
+    warp::test::request().method("GET").path("/").reply(&routes).await;
 
   // warp::redirect returns 301 (Moved Permanently)
   assert_eq!(response.status(), 301, "Root path must redirect");

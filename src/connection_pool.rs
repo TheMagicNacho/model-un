@@ -53,8 +53,9 @@ impl ConnectionPool
 #[cfg(test)]
 mod tests
 {
-  use super::*;
   use tokio::sync::mpsc;
+
+  use super::*;
 
   /// Adding a connection stores it under the given room key.
   #[tokio::test]
@@ -107,7 +108,8 @@ mod tests
     assert_eq!(guard["room-partial"].len(), 1);
   }
 
-  /// Calling remove for a room that does not exist is a no-op and does not panic.
+  /// Calling remove for a room that does not exist is a no-op and does not
+  /// panic.
   #[tokio::test]
   async fn test_remove_from_nonexistent_room_is_noop()
   {

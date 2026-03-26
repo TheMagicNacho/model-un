@@ -42,11 +42,12 @@ impl Game
     players: &[PlayerState],
   ) -> Option<usize>
   {
-    if players.len() >= 6
+    let active_count = players.iter().filter(|p| p.player_id < 100).count();
+    if active_count < 12
     {
       players
         .iter()
-        .find(|player| player.player_id > 10)
+        .find(|player| player.player_id >= 100)
         .map(|player| player.player_id)
     }
     else
@@ -363,7 +364,8 @@ mod tests
 
   // ── Room management ──────────────────────────────────────────────────────
 
-  /// Generating a room with a given name stores an empty GameState for that name.
+  /// Generating a room with a given name stores an empty GameState for that
+  /// name.
   #[tokio::test]
   async fn test_generate_new_room_creates_empty_room()
   {
@@ -431,7 +433,8 @@ mod tests
     assert_eq!(game.new_player("p-room-reuse").await, 1);
   }
 
-  /// New players get an overflow ID (≥ 100) when the room already has 12 players.
+  /// New players get an overflow ID (≥ 100) when the room already has 12
+  /// players.
   #[tokio::test]
   async fn test_new_player_overflow_id_when_room_full()
   {
@@ -442,7 +445,10 @@ mod tests
       game.new_player("p-room-full").await;
     }
     let overflow_id = game.new_player("p-room-full").await;
-    assert!(overflow_id >= 100, "Expected overflow ID ≥ 100, got {overflow_id}");
+    assert!(
+      overflow_id >= 100,
+      "Expected overflow ID ≥ 100, got {overflow_id}"
+    );
   }
 
   /// A new player starts with the default name and no value.
@@ -473,32 +479,37 @@ mod tests
     assert!(state.players.iter().all(|p| p.player_id != 0));
   }
 
-  /// When the room has ≥ 6 remaining players and a waiting player exists
-  /// (ID > 10), that player is promoted to fill the vacant slot.
+  /// When 12 active players are present plus a spectating player (ID ≥ 100),
+  /// removing an active player promotes the spectator into the vacant slot.
   #[tokio::test]
   async fn test_remove_player_promotes_waiting_player()
   {
     let game = new_game();
     game.generate_new_room(Some("r-room-promote")).await;
-    // Fill to 12 players – player 11 has player_id=11 which is > 10
+    // Fill 12 active players (IDs 0–11)
     for _ in 0..12
     {
       game.new_player("r-room-promote").await;
     }
-    // Remove player 0 (vacancy); player 11 should be promoted into slot 0
+    // 13th join → spectator with ID ≥ 100
+    let spectator_id = game.new_player("r-room-promote").await;
+    assert!(spectator_id >= 100, "13th player must be a spectator");
+
+    // Remove player 0 (vacancy); spectator should be promoted into slot 0
     game.remove_player("r-room-promote", 0).await;
     let state = game.get_room_state("r-room-promote").await.unwrap();
 
-    // Player 11 no longer has id=11
-    assert!(state.players.iter().all(|p| p.player_id != 11));
+    // Spectator no longer retains its original spectator ID
+    assert!(state.players.iter().all(|p| p.player_id != spectator_id));
     // Slot 0 is now filled by the promoted player
     assert!(state.players.iter().any(|p| p.player_id == 0));
     // notify_change records the promotion
-    assert_eq!(state.notify_change.current_id, 11);
+    assert_eq!(state.notify_change.current_id, spectator_id);
     assert_eq!(state.notify_change.new_id, 0);
   }
 
-  /// When fewer than 6 players remain after removal, no promotion occurs.
+  /// When fewer than 12 players remain but no spectator exists, no promotion
+  /// occurs.
   #[tokio::test]
   async fn test_remove_player_no_promotion_with_small_room()
   {
@@ -566,7 +577,9 @@ mod tests
     game
       .process_client_message(
         "m-room-rn-show",
-        ClientMessage::RevealNumbers { value: true },
+        ClientMessage::RevealNumbers {
+          value: true,
+        },
       )
       .await;
     let state = game.get_room_state("m-room-rn-show").await.unwrap();
@@ -593,13 +606,17 @@ mod tests
     game
       .process_client_message(
         "m-room-rn-hide",
-        ClientMessage::RevealNumbers { value: true },
+        ClientMessage::RevealNumbers {
+          value: true,
+        },
       )
       .await;
     game
       .process_client_message(
         "m-room-rn-hide",
-        ClientMessage::RevealNumbers { value: false },
+        ClientMessage::RevealNumbers {
+          value: false,
+        },
       )
       .await;
     let state = game.get_room_state("m-room-rn-hide").await.unwrap();
@@ -608,9 +625,10 @@ mod tests
     assert_eq!(player.value, Some(0));
   }
 
-  /// RevealNumbers { false } when numbers were never revealed does not reset values.
+  /// RevealNumbers { false } when numbers were never revealed does not reset
+  /// values.
   #[tokio::test]
-  async fn test_process_reveal_numbers_false_no_reset_when_not_previously_revealed()
+  async fn test_hide_without_prior_reveal_keeps_values()
   {
     let game = new_game();
     game.generate_new_room(Some("m-room-rn-noreset")).await;
@@ -628,7 +646,9 @@ mod tests
     game
       .process_client_message(
         "m-room-rn-noreset",
-        ClientMessage::RevealNumbers { value: false },
+        ClientMessage::RevealNumbers {
+          value: false,
+        },
       )
       .await;
     let state = game.get_room_state("m-room-rn-noreset").await.unwrap();
@@ -645,7 +665,12 @@ mod tests
     game.new_player("m-room-pong").await;
     let before = game.get_room_state("m-room-pong").await.unwrap();
     game
-      .process_client_message("m-room-pong", ClientMessage::Pong { player_id: 0 })
+      .process_client_message(
+        "m-room-pong",
+        ClientMessage::Pong {
+          player_id: 0,
+        },
+      )
       .await;
     let after = game.get_room_state("m-room-pong").await.unwrap();
     assert_eq!(before, after);
