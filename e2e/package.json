@@ -1,0 +1,13 @@
+{
+  "name": "model-un-e2e",
+  "version": "1.0.0",
+  "description": "End-to-end Playwright tests for Model UN",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
