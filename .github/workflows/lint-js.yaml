@@ -1,0 +1,30 @@
+name: JavaScript Linting
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint and Format JavaScript Code
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check formatting with oxfmt
+        run: npx --yes oxfmt@0.42.0 --check "client/*.js"
+
+      - name: Run oxlint
+        run: npx --yes oxlint@1.57.0 client/

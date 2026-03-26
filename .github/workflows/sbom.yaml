@@ -1,0 +1,67 @@
+name: SBOM Generation and Analysis
+
+on:
+  push:
+    branches:
+      - main
+      - latest
+  pull_request:
+    branches:
+      - main
+      - latest
+  workflow_dispatch:
+
+jobs:
+  sbom:
+    name: Generate and Analyze SBOM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      security-events: write
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image for SBOM generation
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: model-un:sbom
+          load: true
+
+      - name: Generate SBOM from container image
+        uses: anchore/sbom-action@v0
+        with:
+          image: model-un:sbom
+          format: spdx-json
+          output-file: sbom.spdx.json
+          artifact-name: sbom.spdx.json
+
+      - name: Scan SBOM for vulnerabilities with Grype
+        uses: anchore/scan-action@v6
+        id: grype-scan
+        with:
+          sbom: sbom.spdx.json
+          fail-build: false
+          output-format: sarif
+
+      - name: Upload Grype SARIF results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.grype-scan.outputs.sarif }}
+          category: grype-sbom
+
+      - name: Generate source-level SBOM for Rust
+        run: |
+          cargo install cargo-cyclonedx --locked
+          cargo cyclonedx --format json --spec-version 1.5
+
+      - name: Upload Rust SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-sbom
+          path: "*.cdx.json"
+          retention-days: 30
