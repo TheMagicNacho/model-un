@@ -18,9 +18,6 @@ use tokio_tungstenite::{
   MaybeTlsStream, WebSocketStream, connect_async,
 };
 
-/// Fibonacci values used by the game UI.
-const VOTE_VALUES: &[u8] = &[1, 2, 3, 5, 8, 13, 21];
-
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
@@ -105,18 +102,22 @@ async fn connect_client(
 ///   - Change name once
 ///   - Toggle reveal on/off
 ///
+/// `vote_values` is the set of Fibonacci values to cycle
+/// through for each round.
+///
 /// Returns `true` if the client operated without fatal error.
 async fn simulate_client_activity(
   ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
   player_id: usize,
   rounds: usize,
+  vote_values: &[u8],
 ) -> bool
 {
   for round in 0..rounds
   {
     // Pick a Fibonacci value to vote.
     let value =
-      VOTE_VALUES[round % VOTE_VALUES.len()];
+      vote_values[round % vote_values.len()];
 
     let change_value = serde_json::to_string(
       &ClientMessage::ChangeValue {
@@ -191,26 +192,24 @@ async fn simulate_client_activity(
 // Tests
 // ------------------------------------------------------------------
 
-/// Validates that at least 20 unique WebSocket connections can
-/// operate simultaneously across multiple rooms that are filled
-/// to capacity.
+/// Validates that 24 unique WebSocket connections can operate
+/// simultaneously across two rooms that are filled to capacity.
 ///
 /// Room capacity: 12 delegates (ids 0-11) + spectators (ids
-/// 100+). To exercise "rooms filled up" we use 2 rooms with
-/// 12 connections each (24 total ≥ 20 minimum).
+/// 100+). We use 2 rooms with 12 connections each (24 total).
 ///
 /// Each client constantly changes its value, changes its name,
 /// and toggles reveal, then we assert the server did not crash.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn test_minimum_20_concurrent_connections()
+async fn test_minimum_24_concurrent_connections()
 {
   let addr = start_server().await;
+  let activity_rounds: usize = 20;
 
   let room_a = "LoadTestRoomAlpha";
   let room_b = "LoadTestRoomBeta";
   let clients_per_room: usize = 12;
   let total_clients = clients_per_room * 2;
-  assert!(total_clients >= 20);
 
   // Connect all clients. We store handles so we can
   // join them later.
@@ -231,7 +230,14 @@ async fn test_minimum_20_concurrent_connections()
     let handle: JoinHandle<bool> = tokio::spawn(async move {
       let (mut ws, player_id) =
         connect_client(addr, &room).await;
-      simulate_client_activity(&mut ws, player_id, 20).await
+      let vote_values: &[u8] = &[1, 2, 3, 5, 8, 13, 21];
+      simulate_client_activity(
+        &mut ws,
+        player_id,
+        activity_rounds,
+        vote_values,
+      )
+      .await
     });
 
     handles.push(handle);
@@ -277,23 +283,23 @@ async fn test_minimum_20_concurrent_connections()
 /// rejecting or erroring.
 ///
 /// Strategy:
-///   - Distribute connections across rooms (20 per room) to
-///     avoid broadcast-channel saturation.
-///   - Open connections in batches of 20.
+///   - Distribute connections across rooms (12 per room) to
+///     match real room capacity.
+///   - Open connections in batches of 12.
 ///   - Each client sends a quick vote + reveal cycle to prove
 ///     the connection is functional.
 ///   - Stop when a connection or activity fails, or after
-///     reaching a hard cap (200).
-///   - Assert we reached at least 20 (the minimum
-///     requirement).
+///     reaching a hard cap (2000).
+///   - Assert we reached at least 24 connections.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_find_maximum_connections()
 {
   let addr = start_server().await;
+  let vote_values: &[u8] = &[1, 2, 3, 5, 8, 13, 21];
 
-  let clients_per_room: usize = 20;
-  let batch_size: usize = 20;
-  let hard_cap: usize = 200;
+  let clients_per_room: usize = 12;
+  let batch_size: usize = 12;
+  let hard_cap: usize = 2000;
 
   let mut current_count: usize = 0;
   let mut room_index: usize = 0;
@@ -347,7 +353,13 @@ async fn test_find_maximum_connections()
     for (ws, pid) in
       &mut live_connections[start..current_count]
     {
-      if !simulate_client_activity(ws, *pid, 5).await
+      if !simulate_client_activity(
+        ws,
+        *pid,
+        5,
+        vote_values,
+      )
+      .await
       {
         hit_limit = true;
         break;
@@ -368,8 +380,8 @@ async fn test_find_maximum_connections()
   );
 
   assert!(
-    current_count >= 20,
-    "Server should handle at least 20 concurrent \
+    current_count >= 24,
+    "Server should handle at least 24 concurrent \
      connections, but only managed {current_count}"
   );
 }
