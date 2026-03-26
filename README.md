@@ -85,6 +85,8 @@ The General Assembly welcomes contributions from all nations! Whether you're fix
 NOTE! Make sure that your PR passes the CI/CD pipeline.
 Run `cargo clippy` and `cargo fmt` to ensure your code is up to the Rust standards.
 
+We use Oxlint and Oxfmt for the javascript. Be sure to validate with `npx --yes oxlynt ./client/ && npx --yes oxfmt ./client/`
+
 ### Contribution Ideas
 - Mobile-responsive design improvements
 - Additional voting schemes (beyond Fibonacci)
