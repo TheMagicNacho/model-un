@@ -410,7 +410,7 @@ async fn test_minimum_24_concurrent_connections()
 
   for handle in handles
   {
-    match timeout(Duration::from_secs(30), handle).await
+    match timeout(Duration::from_secs(5), handle).await
     {
       Ok(Ok((true, last_state, room))) =>
       {
@@ -488,7 +488,9 @@ async fn test_find_maximum_connections()
 
   let clients_per_room: usize = 12;
   let batch_size: usize = 12;
-  let hard_cap: usize = 5000;
+  // We have tested up to 5000 connections. But that takes a long time to run in the pipeline.
+  // So we are keeping the hard cap for this at 100.
+  let hard_cap: usize = 100;
 
   let mut current_count: usize = 0;
   let mut room_index: usize = 0;
@@ -516,7 +518,7 @@ async fn test_find_maximum_connections()
 
       // Connect with a short timeout.
       let result = timeout(
-        Duration::from_secs(5),
+        Duration::from_secs(1),
         connect_client(addr, &room),
       )
       .await;
