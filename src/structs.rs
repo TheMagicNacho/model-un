@@ -54,6 +54,11 @@ pub enum ClientMessage
   {
     player_id: usize
   },
+  ChangeSeat
+  {
+    player_id: usize,
+    new_seat: usize,
+  },
 }
 
 // The JSON from the server to the client.

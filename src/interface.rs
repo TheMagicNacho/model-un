@@ -107,6 +107,9 @@ impl GameWebSocket
     let mut ws_tx = connection_context.ws_tx;
     let mut ws_rx = connection_context.ws_rx;
 
+    // Track current player_id; it may change if the player switches seats.
+    let mut player_id = player_id;
+
     loop
     {
       tokio::select! {
@@ -119,7 +122,9 @@ impl GameWebSocket
                               serde_json::from_str::<ClientMessage>(text)
                       {
                           debug!("Client Message: {:?}", client_message);
-                          game_state.process_client_message(&room, client_message).await;
+                          if let Some(new_id) = game_state.process_client_message(&room, client_message).await {
+                              player_id = new_id;
+                          }
                           if let Some(room_state) = game_state.get_room_state(&room).await {
                               let _ = tx.send(RoomUpdate {
                                   room: room.to_string(),

@@ -283,11 +283,16 @@ impl Game
     player_id
   }
 
+  /// Process a message received from a client and update the room state.
+  ///
+  /// Returns `Some(new_id)` when the sending player's seat (player ID) has
+  /// changed — the caller must update its locally tracked player ID accordingly.
+  /// Returns `None` for all other message types.
   pub async fn process_client_message(
     &self,
     room: &str,
     message: ClientMessage,
-  )
+  ) -> Option<usize>
   {
     debug!("process_client_message - Room: {}, Message: {:?}", room, message);
 
@@ -305,6 +310,7 @@ impl Game
       } =>
       {
         debug!("Player {} ponged.", player_id);
+        None
       },
       ClientMessage::ChangeValue {
         player_id,
@@ -316,6 +322,7 @@ impl Game
         {
           player.value = Some(value);
         }
+        None
       },
       ClientMessage::ChangeName {
         player_id,
@@ -327,6 +334,7 @@ impl Game
         {
           player.player_name = name;
         }
+        None
       },
       ClientMessage::RevealNumbers {
         value,
@@ -346,6 +354,38 @@ impl Game
         }
         // Update the state
         room_state.all_revealed = value;
+        None
+      },
+      ClientMessage::ChangeSeat {
+        player_id,
+        new_seat,
+      } =>
+      {
+        let max_room_size = 12;
+        let is_valid = new_seat < max_room_size
+          && room_state.players.iter().all(|p| p.player_id != new_seat);
+
+        if is_valid
+        {
+          if let Some(player) =
+            room_state.players.iter_mut().find(|p| p.player_id == player_id)
+          {
+            player.player_id = new_seat;
+          }
+          room_state.notify_change = NotifyChange {
+            current_id: player_id,
+            new_id: new_seat,
+          };
+          debug!(
+            "Player {} moved to seat {} in room {}",
+            player_id, new_seat, room
+          );
+          Some(new_seat)
+        }
+        else
+        {
+          None
+        }
       },
     }
   }
@@ -674,5 +714,173 @@ mod tests
       .await;
     let after = game.get_room_state("m-room-pong").await.unwrap();
     assert_eq!(before, after);
+  }
+
+  // ── Seat switching ───────────────────────────────────────────────────────
+
+  /// A player can move to a vacant seat within the active range (0-11).
+  #[tokio::test]
+  async fn test_change_seat_moves_player_to_vacant_seat()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("s-room-move")).await;
+    game.new_player("s-room-move").await; // id 0
+    game.new_player("s-room-move").await; // id 1
+
+    let new_id = game
+      .process_client_message(
+        "s-room-move",
+        ClientMessage::ChangeSeat {
+          player_id: 1,
+          new_seat: 5,
+        },
+      )
+      .await;
+
+    assert_eq!(new_id, Some(5));
+    let state = game.get_room_state("s-room-move").await.unwrap();
+    assert!(state.players.iter().any(|p| p.player_id == 5));
+    assert!(state.players.iter().all(|p| p.player_id != 1));
+    assert_eq!(state.notify_change.current_id, 1);
+    assert_eq!(state.notify_change.new_id, 5);
+  }
+
+  /// Moving to a seat already occupied by another player is rejected.
+  #[tokio::test]
+  async fn test_change_seat_rejects_occupied_seat()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("s-room-occupied")).await;
+    game.new_player("s-room-occupied").await; // id 0
+    game.new_player("s-room-occupied").await; // id 1
+
+    let result = game
+      .process_client_message(
+        "s-room-occupied",
+        ClientMessage::ChangeSeat {
+          player_id: 1,
+          new_seat: 0, // seat 0 is taken
+        },
+      )
+      .await;
+
+    assert_eq!(result, None);
+    let state = game.get_room_state("s-room-occupied").await.unwrap();
+    assert!(state.players.iter().any(|p| p.player_id == 1));
+    assert!(state.players.iter().any(|p| p.player_id == 0));
+  }
+
+  /// Moving to a seat index >= 12 (overflow zone) is rejected.
+  #[tokio::test]
+  async fn test_change_seat_rejects_overflow_seat()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("s-room-overflow")).await;
+    game.new_player("s-room-overflow").await; // id 0
+
+    let result = game
+      .process_client_message(
+        "s-room-overflow",
+        ClientMessage::ChangeSeat {
+          player_id: 0,
+          new_seat: 12,
+        },
+      )
+      .await;
+
+    assert_eq!(result, None);
+    let state = game.get_room_state("s-room-overflow").await.unwrap();
+    assert!(state.players.iter().any(|p| p.player_id == 0));
+  }
+
+  /// After a seat change the player's name and value are preserved.
+  #[tokio::test]
+  async fn test_change_seat_preserves_player_name_and_value()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("s-room-preserve")).await;
+    game.new_player("s-room-preserve").await; // id 0
+    game
+      .process_client_message(
+        "s-room-preserve",
+        ClientMessage::ChangeName {
+          player_id: 0,
+          name: "Alice".to_string(),
+        },
+      )
+      .await;
+    game
+      .process_client_message(
+        "s-room-preserve",
+        ClientMessage::ChangeValue {
+          player_id: 0,
+          value: 8,
+        },
+      )
+      .await;
+
+    game
+      .process_client_message(
+        "s-room-preserve",
+        ClientMessage::ChangeSeat {
+          player_id: 0,
+          new_seat: 3,
+        },
+      )
+      .await;
+
+    let state = game.get_room_state("s-room-preserve").await.unwrap();
+    let player = state.players.iter().find(|p| p.player_id == 3).unwrap();
+    assert_eq!(player.player_name, "Alice");
+    assert_eq!(player.value, Some(8));
+  }
+
+  /// The captain is the active player with the lowest player_id.
+  /// After a seat change that gives another player the lowest seat, captainhood
+  /// transfers and values are unchanged (sequence preserved).
+  #[tokio::test]
+  async fn test_captain_transfers_on_seat_change()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("s-room-captain")).await;
+    game.new_player("s-room-captain").await; // id 0 (captain)
+    game.new_player("s-room-captain").await; // id 1
+
+    // Give player 0 a vote
+    game
+      .process_client_message(
+        "s-room-captain",
+        ClientMessage::ChangeValue {
+          player_id: 0,
+          value: 5,
+        },
+      )
+      .await;
+
+    // Player 0 (captain) moves to seat 3, relinquishing captainhood to player 1
+    game
+      .process_client_message(
+        "s-room-captain",
+        ClientMessage::ChangeSeat {
+          player_id: 0,
+          new_seat: 3,
+        },
+      )
+      .await;
+
+    let state = game.get_room_state("s-room-captain").await.unwrap();
+    // Player 1 now holds the lowest ID — they are the new captain
+    let min_id = state
+      .players
+      .iter()
+      .filter(|p| p.player_id < 100)
+      .map(|p| p.player_id)
+      .min()
+      .unwrap();
+    assert_eq!(min_id, 1);
+
+    // The former captain (now player 3) retains their vote
+    let former_captain = state.players.iter().find(|p| p.player_id == 3).unwrap();
+    assert_eq!(former_captain.value, Some(5));
   }
 }

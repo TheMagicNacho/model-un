@@ -46,6 +46,31 @@ class Game {
     reveal_button.addEventListener("click", () => {
       this.handle_reveal_button_click(this.local_state, ws);
     });
+
+    // Add click handlers to all player card slots for seat switching
+    for (let i = 0; i < this.max_table_size; i++) {
+      const player_card = document.getElementById(`player${i}id`);
+      if (player_card) {
+        player_card.addEventListener("click", () => {
+          this.handle_seat_change(i, ws);
+        });
+      }
+    }
+  }
+
+  handle_seat_change(new_seat, ws) {
+    // Only switch if clicking a different, vacant seat
+    if (this.local_state.player_id === new_seat) return;
+    const is_vacant = !this.server_state.players?.some((p) => p.player_id === new_seat);
+    if (is_vacant) {
+      ws.send(
+        JSON.stringify({
+          type: "ChangeSeat",
+          player_id: this.local_state.player_id,
+          new_seat: new_seat,
+        }),
+      );
+    }
   }
 
   handle_reveal_button_click(local_state, ws) {
@@ -143,8 +168,16 @@ class Game {
     });
   }
 
+  get_captain_id() {
+    if (!this.server_state.players || this.server_state.players.length === 0) return null;
+    const active = this.server_state.players.filter((p) => p.player_id < this.overflow_index);
+    if (active.length === 0) return null;
+    return Math.min(...active.map((p) => p.player_id));
+  }
+
   update_dom_from_server_state() {
     const current_size = this.server_state.players.length;
+    const captain_id = this.get_captain_id();
 
     const tableArea = document.getElementsByClassName("table-area")[0];
     if (tableArea && current_size > 6 && current_size !== this.local_state.previous_player_size) {
@@ -177,6 +210,7 @@ class Game {
         // Reset state for all cards first
         player_card_element.classList.remove("player-ready");
         player_card_element.classList.add("player-vacant");
+        player_card_element.classList.remove("player-captain");
 
         // Find if there's a player for this position
         const player = this.server_state.players.find((p) => p.player_id === i);
@@ -186,6 +220,9 @@ class Game {
           player_card_element.classList.remove("player-vacant");
           if (player.value > 0) {
             player_card_element.classList.add("player-ready");
+          }
+          if (player.player_id === captain_id) {
+            player_card_element.classList.add("player-captain");
           }
 
           if (player_name_element) {
@@ -248,40 +285,44 @@ class Game {
           }
         }
       }
-      const control_area = document.getElementById("polymorphic-hud");
-      const value_input = document.getElementById("player_value");
-      const reveal_button = document.getElementById("reveal-button");
-      const value_label = document.querySelector('label[for="player_value"]');
+    }
 
-      if (this.local_state.player_id > this.overflow_index) {
-        // Spectator Mode
+    const control_area = document.getElementById("polymorphic-hud");
+    const value_input = document.getElementById("player_value");
+    const reveal_button = document.getElementById("reveal-button");
+    const value_label = document.querySelector('label[for="player_value"]');
+    const is_captain = this.local_state.player_id === captain_id;
 
-        if (control_area) {
-          if (value_input) value_input.style.visibility = "hidden";
-          if (reveal_button) reveal_button.style.visibility = "hidden";
-          if (value_label) value_label.style.visibility = "hidden";
+    if (this.local_state.player_id > this.overflow_index) {
+      // Spectator Mode
 
-          // Create and insert the Spectator Mode message
-          if (!document.getElementById("spectator-message")) {
-            const spectator_message = document.createElement("div");
-            spectator_message.innerHTML =
-              "" +
-              "<h2>Spectator Mode</h2>" +
-              "<p>All the delegate seats are taken.</p>" +
-              "<p>When a current delegate leaves, you will automatically take their seat. In the mean time, feel free to enter your name!</p>";
+      if (control_area) {
+        if (value_input) value_input.style.visibility = "hidden";
+        if (reveal_button) reveal_button.style.visibility = "hidden";
+        if (value_label) value_label.style.visibility = "hidden";
 
-            spectator_message.id = "spectator-message"; // Give it an ID if you need to manipulate it later.
-            control_area.appendChild(spectator_message);
-          }
+        // Create and insert the Spectator Mode message
+        if (!document.getElementById("spectator-message")) {
+          const spectator_message = document.createElement("div");
+          spectator_message.innerHTML =
+            "" +
+            "<h2>Spectator Mode</h2>" +
+            "<p>All the delegate seats are taken.</p>" +
+            "<p>When a current delegate leaves, you will automatically take their seat. In the mean time, feel free to enter your name!</p>";
+
+          spectator_message.id = "spectator-message"; // Give it an ID if you need to manipulate it later.
+          control_area.appendChild(spectator_message);
         }
-      } else {
-        if (value_input) value_input.style.visibility = "visible";
-        if (reveal_button) reveal_button.style.visibility = "visible";
-        if (value_label) value_label.style.visibility = "visible";
+      }
+    } else {
+      if (value_input) value_input.style.visibility = "visible";
+      if (value_label) value_label.style.visibility = "visible";
 
-        if (document.getElementById("spectator-message")) {
-          document.getElementById("spectator-message").remove();
-        }
+      // Only the captain can reveal/reset votes
+      if (reveal_button) reveal_button.style.display = is_captain ? "" : "none";
+
+      if (document.getElementById("spectator-message")) {
+        document.getElementById("spectator-message").remove();
       }
     }
   }
