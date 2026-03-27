@@ -96,7 +96,7 @@ We use Oxlint and Oxfmt for the javascript. Be sure to validate with `npx --yes 
 - Internationalization support
 - Performance optimizations for large assemblies
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### Prerequisites
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable)
