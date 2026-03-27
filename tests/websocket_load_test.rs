@@ -16,9 +16,7 @@ use tokio::sync::Barrier;
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_tungstenite::tungstenite::Message;
-use tokio_tungstenite::{
-  MaybeTlsStream, WebSocketStream, connect_async,
-};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 // ------------------------------------------------------------------
 // Helpers
@@ -28,16 +26,11 @@ use tokio_tungstenite::{
 async fn start_server() -> SocketAddr
 {
   let (ws_route, _tx) = build_ws_route();
-  let listener =
-    tokio::net::TcpListener::bind(("127.0.0.1", 0u16))
-      .await
-      .expect("failed to bind");
-  let addr = listener
-    .local_addr()
-    .expect("failed to get local addr");
-  tokio::spawn(
-    warp::serve(ws_route).incoming(listener).run(),
-  );
+  let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0u16))
+    .await
+    .expect("failed to bind");
+  let addr = listener.local_addr().expect("failed to get local addr");
+  tokio::spawn(warp::serve(ws_route).incoming(listener).run());
   // Give the server a moment to start accepting.
   tokio::time::sleep(Duration::from_millis(50)).await;
   addr
@@ -49,16 +42,12 @@ async fn start_server() -> SocketAddr
 async fn connect_client(
   addr: SocketAddr,
   room: &str,
-) -> (
-  WebSocketStream<MaybeTlsStream<TcpStream>>,
-  usize,
-)
+) -> (WebSocketStream<MaybeTlsStream<TcpStream>>, usize)
 {
   let url = format!("ws://{addr}/ws/{room}");
 
-  let (ws, _resp) = connect_async(&url)
-    .await
-    .expect("WebSocket handshake failed");
+  let (ws, _resp) =
+    connect_async(&url).await.expect("WebSocket handshake failed");
 
   // The server sends two messages on connect:
   //   1. PlayerAssigned { player_id }
@@ -72,19 +61,14 @@ async fn connect_client(
   // Read up to 2 initial messages within a timeout.
   for _ in 0..2
   {
-    match timeout(
-      Duration::from_secs(5),
-      stream.next(),
-    )
-    .await
+    match timeout(Duration::from_secs(5), stream.next()).await
     {
       Ok(Some(Ok(msg))) =>
       {
         if let Ok(text) = msg.into_text()
           && let Ok(ServerMessage::PlayerAssigned {
             player_id: pid,
-          }) =
-            serde_json::from_str::<ServerMessage>(&text)
+          }) = serde_json::from_str::<ServerMessage>(&text)
         {
           player_id = Some(pid);
         }
@@ -99,8 +83,7 @@ async fn connect_client(
 }
 
 /// Simulate a single client performing a series of actions:
-///   - Change value several times (cycling through Fibonacci
-///     values)
+///   - Change value several times (cycling through Fibonacci values)
 ///   - Change name once
 ///   - Toggle reveal on/off
 ///
@@ -109,9 +92,8 @@ async fn connect_client(
 ///
 /// Returns a tuple of:
 ///   - `bool`: whether the client operated without fatal error
-///   - `Option<GameState>`: the last room state observed from
-///     server broadcasts (used to validate state homogeneity
-///     across room members)
+///   - `Option<GameState>`: the last room state observed from server broadcasts
+///     (used to validate state homogeneity across room members)
 async fn simulate_client_activity(
   ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
   player_id: usize,
@@ -124,20 +106,14 @@ async fn simulate_client_activity(
   for round in 0..rounds
   {
     // Pick a Fibonacci value to vote.
-    let value =
-      vote_values[round % vote_values.len()];
+    let value = vote_values[round % vote_values.len()];
 
-    let change_value = serde_json::to_string(
-      &ClientMessage::ChangeValue {
-        player_id,
-        value,
-      },
-    )
+    let change_value = serde_json::to_string(&ClientMessage::ChangeValue {
+      player_id,
+      value,
+    })
     .unwrap();
-    if ws
-      .send(Message::Text(change_value.into()))
-      .await
-      .is_err()
+    if ws.send(Message::Text(change_value.into())).await.is_err()
     {
       return (false, last_state);
     }
@@ -145,17 +121,12 @@ async fn simulate_client_activity(
     // Change name occasionally.
     if round % 3 == 0
     {
-      let change_name = serde_json::to_string(
-        &ClientMessage::ChangeName {
-          player_id,
-          name: format!("Player_{player_id}_r{round}"),
-        },
-      )
+      let change_name = serde_json::to_string(&ClientMessage::ChangeName {
+        player_id,
+        name: format!("Player_{player_id}_r{round}"),
+      })
       .unwrap();
-      if ws
-        .send(Message::Text(change_name.into()))
-        .await
-        .is_err()
+      if ws.send(Message::Text(change_name.into())).await.is_err()
       {
         return (false, last_state);
       }
@@ -164,30 +135,20 @@ async fn simulate_client_activity(
     // Toggle reveal periodically.
     if round % 5 == 0
     {
-      let reveal = serde_json::to_string(
-        &ClientMessage::RevealNumbers {
-          value: true,
-        },
-      )
+      let reveal = serde_json::to_string(&ClientMessage::RevealNumbers {
+        value: true,
+      })
       .unwrap();
-      if ws
-        .send(Message::Text(reveal.into()))
-        .await
-        .is_err()
+      if ws.send(Message::Text(reveal.into())).await.is_err()
       {
         return (false, last_state);
       }
 
-      let reset = serde_json::to_string(
-        &ClientMessage::RevealNumbers {
-          value: false,
-        },
-      )
+      let reset = serde_json::to_string(&ClientMessage::RevealNumbers {
+        value: false,
+      })
       .unwrap();
-      if ws
-        .send(Message::Text(reset.into()))
-        .await
-        .is_err()
+      if ws.send(Message::Text(reset.into())).await.is_err()
       {
         return (false, last_state);
       }
@@ -196,19 +157,12 @@ async fn simulate_client_activity(
     // Drain any pending server messages so the receiver
     // buffer does not fill up. Track the last
     // UpdateState to validate room state consistency.
-    while let Ok(Some(Ok(msg))) = timeout(
-      Duration::from_millis(5),
-      ws.next(),
-    )
-    .await
+    while let Ok(Some(Ok(msg))) =
+      timeout(Duration::from_millis(5), ws.next()).await
     {
       if let Ok(text) = msg.into_text()
-        && let Ok(
-          ServerMessage::UpdateState(state),
-        ) =
-          serde_json::from_str::<ServerMessage>(
-            &text,
-          )
+        && let Ok(ServerMessage::UpdateState(state)) =
+          serde_json::from_str::<ServerMessage>(&text)
       {
         last_state = Some(state);
       }
@@ -217,8 +171,7 @@ async fn simulate_client_activity(
     // Small delay between rounds to prevent broadcast
     // channel overflow when many clients are active
     // concurrently in the same room.
-    tokio::time::sleep(Duration::from_millis(10))
-      .await;
+    tokio::time::sleep(Duration::from_millis(10)).await;
   }
 
   (true, last_state)
@@ -229,15 +182,12 @@ async fn simulate_client_activity(
 /// barrier so all clients collect state while every
 /// connection is still open.
 async fn drain_final_state(
-  ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+  ws: &mut WebSocketStream<MaybeTlsStream<TcpStream>>
 ) -> Option<GameState>
 {
   let mut last_state: Option<GameState> = None;
-  while let Ok(Some(Ok(msg))) = timeout(
-    Duration::from_millis(50),
-    ws.next(),
-  )
-  .await
+  while let Ok(Some(Ok(msg))) =
+    timeout(Duration::from_millis(50), ws.next()).await
   {
     if let Ok(text) = msg.into_text()
       && let Ok(ServerMessage::UpdateState(state)) =
@@ -263,17 +213,11 @@ fn assert_room_state_homogeneity(
   expected_player_count: usize,
 )
 {
-  assert!(
-    !states.is_empty(),
-    "No states collected for room {room}"
-  );
+  assert!(!states.is_empty(), "No states collected for room {room}");
 
   let reference = &states[0];
-  let mut ref_ids: Vec<usize> = reference
-    .players
-    .iter()
-    .map(|p| p.player_id)
-    .collect();
+  let mut ref_ids: Vec<usize> =
+    reference.players.iter().map(|p| p.player_id).collect();
   ref_ids.sort();
 
   // Every observed state must have the expected number
@@ -288,11 +232,8 @@ fn assert_room_state_homogeneity(
       state.players.len(),
     );
 
-    let mut ids: Vec<usize> = state
-      .players
-      .iter()
-      .map(|p| p.player_id)
-      .collect();
+    let mut ids: Vec<usize> =
+      state.players.iter().map(|p| p.player_id).collect();
     ids.sort();
 
     assert_eq!(
@@ -314,22 +255,20 @@ fn assert_room_state_homogeneity(
 /// 100+). We use 2 rooms with 12 connections each (24 total).
 ///
 /// The test runs in three phases:
-///   1. **Connect** – all 24 clients establish WebSocket
-///      connections before any activity begins.
-///   2. **Activity** – all clients concurrently change values,
-///      rename, and toggle reveal.
-///   3. **Barrier + state snapshot** – a `tokio::sync::Barrier`
-///      ensures every client finishes activity and keeps its
-///      connection open while all clients drain remaining
-///      server messages. The last `UpdateState` each client
-///      sees is collected.
+///   1. **Connect** – all 24 clients establish WebSocket connections before any
+///      activity begins.
+///   2. **Activity** – all clients concurrently change values, rename, and
+///      toggle reveal.
+///   3. **Barrier + state snapshot** – a `tokio::sync::Barrier` ensures every
+///      client finishes activity and keeps its connection open while all
+///      clients drain remaining server messages. The last `UpdateState` each
+///      client sees is collected.
 ///
 /// After the barrier we assert:
 ///   1. All 24 clients finished without errors.
-///   2. Room state homogeneity: every client within a room
-///      observed the same player count and the same set of
-///      player IDs. This catches caching or concurrency bugs
-///      that might cause divergent views under load.
+///   2. Room state homogeneity: every client within a room observed the same
+///      player count and the same set of player IDs. This catches caching or
+///      concurrency bugs that might cause divergent views under load.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_minimum_24_concurrent_connections()
 {
@@ -359,44 +298,33 @@ async fn test_minimum_24_concurrent_connections()
     {
       room_b.to_string()
     };
-    let (ws, pid) =
-      connect_client(addr, &room).await;
+    let (ws, pid) = connect_client(addr, &room).await;
     connections.push((ws, pid, room));
-    tokio::time::sleep(Duration::from_millis(10))
-      .await;
+    tokio::time::sleep(Duration::from_millis(10)).await;
   }
 
   // Phase 2 + 3: Run activity, then barrier + drain.
   // The barrier keeps every connection alive until ALL
   // clients have finished activity so that no player is
   // removed from the room before the state snapshot.
-  let barrier =
-    Arc::new(Barrier::new(total_clients));
-  let mut handles: Vec<
-    JoinHandle<(bool, Option<GameState>, String)>,
-  > = Vec::with_capacity(total_clients);
+  let barrier = Arc::new(Barrier::new(total_clients));
+  let mut handles: Vec<JoinHandle<(bool, Option<GameState>, String)>> =
+    Vec::with_capacity(total_clients);
 
   for (ws, pid, room) in connections
   {
     let b = barrier.clone();
     let handle = tokio::spawn(async move {
       let mut ws = ws;
-      let vote_values: &[u8] =
-        &[1, 2, 3, 5, 8, 13, 21];
+      let vote_values: &[u8] = &[1, 2, 3, 5, 8, 13, 21];
       let (ok, _) =
-        simulate_client_activity(
-          &mut ws,
-          pid,
-          activity_rounds,
-          vote_values,
-        )
-        .await;
+        simulate_client_activity(&mut ws, pid, activity_rounds, vote_values)
+          .await;
 
       // Wait for every client to finish activity
       // before draining the final state.
       b.wait().await;
-      let final_state =
-        drain_final_state(&mut ws).await;
+      let final_state = drain_final_state(&mut ws).await;
 
       (ok, final_state, room)
     });
@@ -454,16 +382,8 @@ async fn test_minimum_24_concurrent_connections()
   // Validate room state homogeneity: all clients within
   // a room must have observed the same player count and
   // player ID set.
-  assert_room_state_homogeneity(
-    &room_a_states,
-    room_a,
-    clients_per_room,
-  );
-  assert_room_state_homogeneity(
-    &room_b_states,
-    room_b,
-    clients_per_room,
-  );
+  assert_room_state_homogeneity(&room_a_states, room_a, clients_per_room);
+  assert_room_state_homogeneity(&room_b_states, room_b, clients_per_room);
 }
 
 /// Progressively opens WebSocket connections to find the
@@ -471,15 +391,14 @@ async fn test_minimum_24_concurrent_connections()
 /// rejecting or erroring.
 ///
 /// Strategy:
-///   - Distribute connections across rooms (12 per room) to
-///     match real room capacity.
+///   - Distribute connections across rooms (12 per room) to match real room
+///     capacity.
 ///   - Open connections in batches of 12.
-///   - Each client sends a quick vote + reveal cycle to prove
-///     the connection is functional.
-///   - Stop when a connection or activity fails, or after
-///     reaching a hard cap (5000).
-///   - Assert we maintained concurrent connections up to the
-///     hard cap value.
+///   - Each client sends a quick vote + reveal cycle to prove the connection is
+///     functional.
+///   - Stop when a connection or activity fails, or after reaching a hard cap
+///     (5000).
+///   - Assert we maintained concurrent connections up to the hard cap value.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_find_maximum_connections()
 {
@@ -488,8 +407,8 @@ async fn test_find_maximum_connections()
 
   let clients_per_room: usize = 12;
   let batch_size: usize = 12;
-  // We have tested up to 5000 connections. But that takes a long time to run in the pipeline.
-  // So we are keeping the hard cap for this at 100.
+  // We have tested up to 5000 connections. But that takes a long time to run in
+  // the pipeline. So we are keeping the hard cap for this at 100.
   let hard_cap: usize = 100;
 
   let mut current_count: usize = 0;
@@ -506,8 +425,7 @@ async fn test_find_maximum_connections()
 
   while current_count < hard_cap && !hit_limit
   {
-    let room =
-      format!("MaxRoom_{room_index}");
+    let room = format!("MaxRoom_{room_index}");
 
     for _ in 0..batch_size
     {
@@ -517,11 +435,8 @@ async fn test_find_maximum_connections()
       }
 
       // Connect with a short timeout.
-      let result = timeout(
-        Duration::from_secs(1),
-        connect_client(addr, &room),
-      )
-      .await;
+      let result =
+        timeout(Duration::from_secs(1), connect_client(addr, &room)).await;
 
       match result
       {
@@ -545,18 +460,11 @@ async fn test_find_maximum_connections()
 
     // After each batch, exercise the newest connections
     // with a quick activity cycle.
-    let start =
-      current_count.saturating_sub(batch_size);
-    for (ws, pid) in
-      &mut live_connections[start..current_count]
+    let start = current_count.saturating_sub(batch_size);
+    for (ws, pid) in &mut live_connections[start..current_count]
     {
-      let (ok, _state) = simulate_client_activity(
-        ws,
-        *pid,
-        5,
-        vote_values,
-      )
-      .await;
+      let (ok, _state) =
+        simulate_client_activity(ws, *pid, 5, vote_values).await;
       if !ok
       {
         hit_limit = true;

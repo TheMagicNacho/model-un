@@ -15,15 +15,12 @@ use warp::Filter;
 use crate::connection_pool::ConnectionPool;
 use crate::interface::GameWebSocket;
 
-pub type SharedGameState =
-  Arc<RwLock<HashMap<String, GameState>>>;
+pub type SharedGameState = Arc<RwLock<HashMap<String, GameState>>>;
 
 /// Build the WebSocket route used by both the binary and
 /// integration tests.
-pub fn build_ws_route()
--> (
-  impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection>
-    + Clone,
+pub fn build_ws_route() -> (
+  impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone,
   broadcast::Sender<RoomUpdate>,
 )
 {
@@ -47,22 +44,19 @@ pub fn build_ws_route()
 
 /// Build all routes (index redirect, static files, ws).
 pub fn build_routes()
--> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection>
-     + Clone
+-> impl Filter<Extract = (impl warp::Reply,), Error = warp::Rejection> + Clone
 {
   let game_state = Game::instance();
 
-  let index_route =
-    warp::path::end().and_then(async move || {
-      let room_name =
-        game_state.random_name_generator().await;
-      Ok::<_, warp::Rejection>(warp::redirect(
-        warp::http::Uri::from_maybe_shared(format!(
-          "/index.html?room={room_name}"
-        ))
-        .unwrap(),
+  let index_route = warp::path::end().and_then(async move || {
+    let room_name = game_state.random_name_generator().await;
+    Ok::<_, warp::Rejection>(warp::redirect(
+      warp::http::Uri::from_maybe_shared(format!(
+        "/index.html?room={room_name}"
       ))
-    });
+      .unwrap(),
+    ))
+  });
 
   let (ws_route, _tx) = build_ws_route();
 
@@ -70,19 +64,18 @@ pub fn build_routes()
     warp::path("portraits.png")
       .and(warp::fs::file("./client/img/portraits.png"))
       .or(
-        warp::path("atlas.png")
-          .and(warp::fs::file("./client/img/atlas.png")),
+        warp::path("atlas.png").and(warp::fs::file("./client/img/atlas.png")),
       ),
   );
 
-  let client_code = warp::path("game.js")
-    .and(warp::fs::file("./client/game.js"));
+  let client_code =
+    warp::path("game.js").and(warp::fs::file("./client/game.js"));
 
-  let client_style = warp::path("style.css")
-    .and(warp::fs::file("./client/style.css"));
+  let client_style =
+    warp::path("style.css").and(warp::fs::file("./client/style.css"));
 
-  let client_html = warp::path("index.html")
-    .and(warp::fs::file("./client/index.html"));
+  let client_html =
+    warp::path("index.html").and(warp::fs::file("./client/index.html"));
 
   warp::get().and(
     index_route
