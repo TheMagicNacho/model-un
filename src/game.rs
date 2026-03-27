@@ -351,10 +351,21 @@ impl Game
         room_state.all_revealed = value;
       },
       ClientMessage::ChangeSequence {
+        player_id,
         sequence,
       } =>
       {
-        room_state.voting_sequence = sequence;
+        // Only the captain (lowest active player_id) may change the sequence.
+        let min_id = room_state
+          .players
+          .iter()
+          .filter(|p| p.player_id < 100)
+          .map(|p| p.player_id)
+          .min();
+        if Some(player_id) == min_id
+        {
+          room_state.voting_sequence = sequence;
+        }
       },
     }
   }
@@ -685,22 +696,24 @@ mod tests
     assert_eq!(before, after);
   }
 
-  /// ChangeSequence updates the room's voting sequence.
+  /// ChangeSequence updates the room's voting sequence when sent by the captain.
   #[tokio::test]
   async fn test_process_change_sequence_updates_voting_sequence()
   {
     let game = new_game();
     game.generate_new_room(Some("m-room-cs")).await;
+    game.new_player("m-room-cs").await; // id 0 – captain
 
     // Default should be Fibonacci
     let initial_state = game.get_room_state("m-room-cs").await.unwrap();
     assert_eq!(initial_state.voting_sequence, VotingSequence::Fibonacci);
 
-    // Change to Linear
+    // Captain (id 0) changes to Linear
     game
       .process_client_message(
         "m-room-cs",
         ClientMessage::ChangeSequence {
+          player_id: 0,
           sequence: VotingSequence::Linear,
         },
       )
@@ -708,16 +721,41 @@ mod tests
     let state = game.get_room_state("m-room-cs").await.unwrap();
     assert_eq!(state.voting_sequence, VotingSequence::Linear);
 
-    // Change to SmMedLgXl
+    // Captain changes to SmMedLgXl
     game
       .process_client_message(
         "m-room-cs",
         ClientMessage::ChangeSequence {
+          player_id: 0,
           sequence: VotingSequence::SmMedLgXl,
         },
       )
       .await;
     let state = game.get_room_state("m-room-cs").await.unwrap();
     assert_eq!(state.voting_sequence, VotingSequence::SmMedLgXl);
+  }
+
+  /// ChangeSequence sent by a non-captain is ignored.
+  #[tokio::test]
+  async fn test_process_change_sequence_ignored_for_non_captain()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-cs-nc")).await;
+    game.new_player("m-room-cs-nc").await; // id 0 – captain
+    game.new_player("m-room-cs-nc").await; // id 1 – non-captain
+
+    // Non-captain (id 1) attempts to change sequence
+    game
+      .process_client_message(
+        "m-room-cs-nc",
+        ClientMessage::ChangeSequence {
+          player_id: 1,
+          sequence: VotingSequence::Linear,
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-cs-nc").await.unwrap();
+    // Sequence must remain unchanged
+    assert_eq!(state.voting_sequence, VotingSequence::Fibonacci);
   }
 }

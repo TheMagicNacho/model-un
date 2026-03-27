@@ -95,7 +95,13 @@ class Game {
     // Sequence option buttons: send ChangeSequence and close popup
     document.querySelectorAll(".sequence-option").forEach((btn) => {
       btn.addEventListener("click", () => {
-        ws.send(JSON.stringify({ type: "ChangeSequence", sequence: btn.dataset.sequence }));
+        ws.send(
+          JSON.stringify({
+            type: "ChangeSequence",
+            player_id: this.local_state.player_id,
+            sequence: btn.dataset.sequence,
+          }),
+        );
         document.getElementById("sequence-popup").style.display = "none";
       });
     });
@@ -121,7 +127,11 @@ class Game {
     const value_input = document.getElementById("player_value");
     if (!value_input) return;
     const current_value = parseInt(value_input.value);
-    value_input.innerHTML = '<option value="0">Select a value</option>';
+    value_input.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "0";
+    placeholder.textContent = "Select a value";
+    value_input.appendChild(placeholder);
     for (const item of sequence) {
       const option = document.createElement("option");
       option.value = item.value;

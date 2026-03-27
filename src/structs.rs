@@ -19,7 +19,6 @@ pub struct PlayerState
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
-#[serde(rename_all = "PascalCase")]
 pub enum VotingSequence
 {
   #[default]
@@ -63,7 +62,7 @@ pub enum ClientMessage
   },
   ChangeSequence
   {
-    sequence: VotingSequence
+    player_id: usize, sequence: VotingSequence
   },
   Pong
   {
