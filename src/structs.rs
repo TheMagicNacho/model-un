@@ -19,11 +19,22 @@ pub struct PlayerState
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "PascalCase")]
+pub enum VotingSequence
+{
+  #[default]
+  Fibonacci,
+  Linear,
+  SmMedLgXl,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
 pub struct GameState
 {
   pub players: Vec<PlayerState>,
   pub all_revealed: bool,
   pub notify_change: NotifyChange,
+  pub voting_sequence: VotingSequence,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
@@ -49,6 +60,10 @@ pub enum ClientMessage
   RevealNumbers
   {
     value: bool
+  },
+  ChangeSequence
+  {
+    sequence: VotingSequence
   },
   Pong
   {

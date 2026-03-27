@@ -150,6 +150,7 @@ p { font-size: small; }
   background: var(--control-bg);
   border-radius: var(--card-radius);
   align-items: center;
+  position: relative;
   box-shadow:
     inset 0 0 50px #fff,
     inset 20px 0 80px #f0f,
@@ -159,6 +160,80 @@ p { font-size: small; }
     0 0 50px #fff,
     -10px 0 80px #f0f,
     10px 0 80px #0ff;
+}
+
+.captain-menu-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.25rem;
+  border-radius: var(--card-radius);
+  transition: transform var(--transition-time) ease-in-out;
+}
+
+.captain-menu-btn:hover {
+  transform: scale(1.2);
+}
+
+.sequence-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  padding: 1.5rem;
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 260px;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+}
+
+.sequence-popup h3 {
+  color: var(--card-text);
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.sequence-option {
+  padding: 0.75rem 1rem;
+  background: var(--button-bg);
+  color: var(--button-text);
+  border: none;
+  border-radius: var(--card-radius);
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background var(--transition-time) ease-in-out;
+}
+
+.sequence-option:hover {
+  background: #ff9aff;
+}
+
+.sequence-option.active {
+  outline: 2px solid var(--player-ready-glow);
+}
+
+.sequence-popup-close {
+  padding: 0.5rem 1rem;
+  background: #555;
+  color: var(--button-text);
+  border: none;
+  border-radius: var(--card-radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background var(--transition-time) ease-in-out;
+}
+
+.sequence-popup-close:hover {
+  background: #777;
 }
 
 .player-controls label {

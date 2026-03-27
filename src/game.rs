@@ -7,7 +7,7 @@ use tokio::sync::{Mutex, RwLock};
 
 use crate::SharedGameState;
 use crate::counter::Counter;
-use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
+use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState, VotingSequence};
 
 pub struct Game
 {
@@ -69,6 +69,7 @@ impl Game
       players: Vec::new(),
       all_revealed: false,
       notify_change: NotifyChange::default(),
+      voting_sequence: VotingSequence::default(),
     });
 
     if let Some(index) =
@@ -155,6 +156,7 @@ impl Game
         players: Vec::new(),
         all_revealed: false,
         notify_change: NotifyChange::default(),
+        voting_sequence: VotingSequence::default(),
       },
     );
     debug!("generate_new_room - Room Name: {} - finished", room_name);
@@ -296,6 +298,7 @@ impl Game
       players: Vec::new(),
       all_revealed: false,
       notify_change: NotifyChange::default(),
+      voting_sequence: VotingSequence::default(),
     });
 
     match message
@@ -346,6 +349,12 @@ impl Game
         }
         // Update the state
         room_state.all_revealed = value;
+      },
+      ClientMessage::ChangeSequence {
+        sequence,
+      } =>
+      {
+        room_state.voting_sequence = sequence;
       },
     }
   }
@@ -674,5 +683,41 @@ mod tests
       .await;
     let after = game.get_room_state("m-room-pong").await.unwrap();
     assert_eq!(before, after);
+  }
+
+  /// ChangeSequence updates the room's voting sequence.
+  #[tokio::test]
+  async fn test_process_change_sequence_updates_voting_sequence()
+  {
+    let game = new_game();
+    game.generate_new_room(Some("m-room-cs")).await;
+
+    // Default should be Fibonacci
+    let initial_state = game.get_room_state("m-room-cs").await.unwrap();
+    assert_eq!(initial_state.voting_sequence, VotingSequence::Fibonacci);
+
+    // Change to Linear
+    game
+      .process_client_message(
+        "m-room-cs",
+        ClientMessage::ChangeSequence {
+          sequence: VotingSequence::Linear,
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-cs").await.unwrap();
+    assert_eq!(state.voting_sequence, VotingSequence::Linear);
+
+    // Change to SmMedLgXl
+    game
+      .process_client_message(
+        "m-room-cs",
+        ClientMessage::ChangeSequence {
+          sequence: VotingSequence::SmMedLgXl,
+        },
+      )
+      .await;
+    let state = game.get_room_state("m-room-cs").await.unwrap();
+    assert_eq!(state.voting_sequence, VotingSequence::SmMedLgXl);
   }
 }

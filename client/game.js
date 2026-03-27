@@ -1,3 +1,33 @@
+const VOTING_SEQUENCES = Object.freeze({
+  Fibonacci: Object.freeze([
+    { value: 1, label: "1" },
+    { value: 2, label: "2" },
+    { value: 3, label: "3" },
+    { value: 5, label: "5" },
+    { value: 8, label: "8" },
+    { value: 13, label: "13" },
+    { value: 21, label: "21" },
+  ]),
+  Linear: Object.freeze([
+    { value: 1, label: "1" },
+    { value: 2, label: "2" },
+    { value: 3, label: "3" },
+    { value: 4, label: "4" },
+    { value: 5, label: "5" },
+    { value: 6, label: "6" },
+    { value: 7, label: "7" },
+    { value: 8, label: "8" },
+    { value: 9, label: "9" },
+    { value: 10, label: "10" },
+  ]),
+  SmMedLgXl: Object.freeze([
+    { value: 1, label: "S" },
+    { value: 2, label: "M" },
+    { value: 3, label: "L" },
+    { value: 4, label: "XL" },
+  ]),
+});
+
 class Game {
   constructor() {
     this.server_state = {};
@@ -7,6 +37,7 @@ class Game {
       name: "",
       value: 0,
       previous_player_size: 0,
+      current_sequence: null,
     };
     // Values must match the server-side values
     this.max_table_size = 12;
@@ -46,6 +77,60 @@ class Game {
     reveal_button.addEventListener("click", () => {
       this.handle_reveal_button_click(this.local_state, ws);
     });
+
+    // Captain's hamburger menu: open popup
+    const captain_btn = document.getElementById("captain-menu-btn");
+    captain_btn.addEventListener("click", () => {
+      const popup = document.getElementById("sequence-popup");
+      popup.style.display = "flex";
+      // Highlight the currently active sequence
+      document.querySelectorAll(".sequence-option").forEach((btn) => {
+        btn.classList.toggle(
+          "active",
+          btn.dataset.sequence === (this.server_state.voting_sequence ?? "Fibonacci"),
+        );
+      });
+    });
+
+    // Sequence option buttons: send ChangeSequence and close popup
+    document.querySelectorAll(".sequence-option").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        ws.send(JSON.stringify({ type: "ChangeSequence", sequence: btn.dataset.sequence }));
+        document.getElementById("sequence-popup").style.display = "none";
+      });
+    });
+
+    // Close button
+    document.getElementById("sequence-popup-close").addEventListener("click", () => {
+      document.getElementById("sequence-popup").style.display = "none";
+    });
+  }
+
+  is_captain() {
+    const active_players = (this.server_state.players || []).filter(
+      (p) => p.player_id < this.overflow_index,
+    );
+    if (active_players.length === 0) return false;
+    const min_id = Math.min(...active_players.map((p) => p.player_id));
+    return this.local_state.player_id === min_id;
+  }
+
+  update_vote_options(sequence_name) {
+    const sequence = VOTING_SEQUENCES[sequence_name];
+    if (!sequence) return;
+    const value_input = document.getElementById("player_value");
+    if (!value_input) return;
+    const current_value = parseInt(value_input.value);
+    value_input.innerHTML = '<option value="0">Select a value</option>';
+    for (const item of sequence) {
+      const option = document.createElement("option");
+      option.value = item.value;
+      option.textContent = item.label;
+      value_input.appendChild(option);
+    }
+    // Preserve selection if the value is still valid in the new sequence
+    const still_valid = sequence.some((item) => item.value === current_value);
+    value_input.value = still_valid ? current_value : 0;
   }
 
   handle_reveal_button_click(local_state, ws) {
@@ -145,6 +230,19 @@ class Game {
 
   update_dom_from_server_state() {
     const current_size = this.server_state.players.length;
+
+    // Update vote options if the sequence changed
+    const server_sequence = this.server_state.voting_sequence ?? "Fibonacci";
+    if (server_sequence !== this.local_state.current_sequence) {
+      this.local_state.current_sequence = server_sequence;
+      this.update_vote_options(server_sequence);
+    }
+
+    // Show the hamburger menu only to the captain
+    const captain_btn = document.getElementById("captain-menu-btn");
+    if (captain_btn) {
+      captain_btn.style.display = this.is_captain() ? "block" : "none";
+    }
 
     const tableArea = document.getElementsByClassName("table-area")[0];
     if (tableArea && current_size > 6 && current_size !== this.local_state.previous_player_size) {
