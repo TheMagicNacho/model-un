@@ -20,7 +20,7 @@ Perfect for:
 - Team-wide decision making
 - Actual Model UN simulations (political science educators rejoice!)
 
-## 🗳️ Features
+## Features
 
 - **Real-time communication** through WebSockets for instant updates
 - **Room-based sessions** - different teams can use separate virtual chambers using the url <url>/index.html?room=<WhateverStringYouWant>
@@ -30,7 +30,7 @@ Perfect for:
 - **Confirmation prompts** when revealing with incomplete votes
 - **Reset functionality** for multiple voting rounds
 
-## 🚀 Quick Start
+## Quick Start
 
 1. Clone this repository:
 ```bash
@@ -55,7 +55,7 @@ add `RUST_LOG=<debug | info | warn | error>` to the command above to set the log
 5. Begin diplomatic negotiations (aka estimation)!
 
 
-## 🔧 Technical Architecture
+## Technical Architecture
 
 ### Frontend
 - Vanilla JavaScript client with WebSocket communication.
@@ -72,7 +72,7 @@ add `RUST_LOG=<debug | info | warn | error>` to the command above to set the log
 - Thread-safe shared state with Arc and Mutex
 
 
-## 🤝 Contributing
+## Contributing
 
 The General Assembly welcomes contributions from all nations! Whether you're fixing bugs, adding features, or improving documentation - your diplomatic efforts strengthen our global codebase.
 
@@ -106,18 +106,18 @@ We use Oxlint and Oxfmt for the javascript. Be sure to validate with `npx --yes 
 ### Environment Variables
 - `LOG_LEVEL`: Logging verbosity (default: info)
 
-## 📋 Code of Conduct
+## Code of Conduct
 
 1. Be respectful to fellow delegates
 2. Maintain diplomatic immunity (but not for bad code)
 3. Ensure your code passes the Security Council review (our CI/CD pipeline)
 4. No vetoing legitimate bug fixes!
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🌟 Acknowledgments
+## Acknowledgments
 
 - Inspired by UN procedures, Civilization, and a hatred of planning poker
 - Built with Rust for reliability and performance
@@ -126,4 +126,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-### "This is how democracy dies, with thunderous applause!" 🕊️
+# "This is how democracy dies, with thunderous applause!" 
