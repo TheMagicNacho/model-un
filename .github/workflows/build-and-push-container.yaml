@@ -1,14 +1,11 @@
 name: Build and Push Rust Container
-
 on:
-  workflow_run:
-    workflows:
-      - Rust Linting
-    types:
-      - completed
-    branches:
-      - main
-      - latest
+  push:
+    tags:
+      - 'v*'         
+      - 'release-*'    
+  workflow_dispatch:   
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
