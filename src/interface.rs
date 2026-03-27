@@ -17,7 +17,7 @@ use crate::structs::{
   ServerMessage,
 };
 
-pub(crate) struct GameWebSocket;
+pub struct GameWebSocket;
 
 impl GameWebSocket
 {

@@ -9,7 +9,7 @@ use crate::SharedGameState;
 use crate::counter::Counter;
 use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
 
-pub(crate) struct Game
+pub struct Game
 {
   game_state: SharedGameState,
   counter: Arc<Mutex<&'static Counter>>, // game_time: Arc<Mutex<SystemTime>>,
@@ -56,7 +56,7 @@ impl Game
     }
   }
 
-  pub(crate) async fn remove_player(
+  pub async fn remove_player(
     &self,
     room: &str,
     player_id: usize,
@@ -137,7 +137,7 @@ impl Game
     );
   }
 
-  pub(crate) async fn generate_new_room(
+  pub async fn generate_new_room(
     &self,
     room: Option<&str>,
   ) -> String
@@ -198,7 +198,7 @@ impl Game
     self.game_state.write().await.insert(room.clone(), state)
   }
 
-  pub(crate) async fn get_room_state(
+  pub async fn get_room_state(
     &self,
     room: &str,
   ) -> Option<GameState>
@@ -249,7 +249,7 @@ impl Game
     player_id
   }
 
-  pub(crate) async fn new_player(
+  pub async fn new_player(
     &self,
     room: &str,
   ) -> usize

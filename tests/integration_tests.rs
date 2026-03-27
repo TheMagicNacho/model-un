@@ -7,12 +7,11 @@
 //! Because `Game::instance()` is a process-wide singleton, every test uses a
 //! unique room name so that parallel test runs do not share game state.
 
+use model_un::connection_pool::ConnectionPool;
+use model_un::interface::GameWebSocket;
+use model_un::structs::{ClientMessage, GameState, RoomUpdate, ServerMessage};
 use tokio::sync::broadcast;
 use warp::Filter;
-
-use crate::connection_pool::ConnectionPool;
-use crate::interface::GameWebSocket;
-use crate::structs::{ClientMessage, GameState, RoomUpdate, ServerMessage};
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
@@ -451,7 +450,7 @@ async fn test_multiple_clients_receive_state_updates()
 #[tokio::test]
 async fn test_index_route_redirects_to_room()
 {
-  let game_state = crate::game::Game::instance();
+  let game_state = model_un::game::Game::instance();
   let index_route = warp::path::end().and_then(async move || {
     let room_name = game_state.random_name_generator().await;
     Ok::<_, warp::Rejection>(warp::redirect(
