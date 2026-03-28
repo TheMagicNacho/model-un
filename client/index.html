@@ -110,6 +110,7 @@
       </div>
 
       <div class="controls-area" >
+        <button id="captain-menu-btn" class="captain-menu-btn" style="display:none;">🍔</button>
         <div class="player-controls" id="polymorphic-hud">
           <label for="player_name">Name</label>
           <input type="text" id="player_name" />
@@ -129,6 +130,14 @@
         <button id="reveal-button" class="reveal-button">
           Reveal All Values
         </button>
+      </div>
+
+      <div id="sequence-popup" class="sequence-popup" style="display:none;">
+        <h3>Voting Sequence</h3>
+        <button class="sequence-option" data-sequence="Fibonacci">Fibonacci (1, 2, 3, 5, 8, 13, 21)</button>
+        <button class="sequence-option" data-sequence="Linear">Linear (1 – 10)</button>
+        <button class="sequence-option" data-sequence="SmMedLgXl">S / M / L / XL</button>
+        <button id="sequence-popup-close" class="sequence-popup-close">Close</button>
       </div>
       <div class="globe"></div>
     </div>

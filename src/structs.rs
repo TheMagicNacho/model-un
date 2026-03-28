@@ -17,6 +17,7 @@ pub struct PlayerState {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+<<<<<<< HEAD
 pub struct GameState {
     pub players: Vec<PlayerState>,
     pub all_revealed: bool,
@@ -24,6 +25,24 @@ pub struct GameState {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+=======
+pub enum VotingSequence {
+    #[default]
+    Fibonacci,
+    Linear,
+    SmMedLgXl,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+pub struct GameState {
+    pub players: Vec<PlayerState>,
+    pub all_revealed: bool,
+    pub notify_change: NotifyChange,
+    pub voting_sequence: VotingSequence,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+>>>>>>> origin/main
 pub struct NotifyChange {
     pub current_id: usize,
     pub new_id: usize,

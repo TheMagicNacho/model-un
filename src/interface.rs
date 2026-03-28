@@ -165,7 +165,6 @@ impl GameWebSocket {
             }; // tokio::select!
         } // loop
         debug!("Connection driver finished for room: {}", room);
-
         pool.remove(&room, &sender).await;
         game_state.remove_player(&room, player_id).await;
     }

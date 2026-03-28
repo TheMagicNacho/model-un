@@ -7,7 +7,7 @@ use tokio::sync::{Mutex, RwLock};
 
 use crate::SharedGameState;
 use crate::counter::Counter;
-use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState};
+use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState, VotingSequence};
 
 pub struct Game {
     game_state: SharedGameState,
@@ -53,6 +53,7 @@ impl Game {
             players: Vec::new(),
             all_revealed: false,
             notify_change: NotifyChange::default(),
+            voting_sequence: VotingSequence::default(),
         });
 
         if let Some(index) = room_state
@@ -125,6 +126,7 @@ impl Game {
                 players: Vec::new(),
                 all_revealed: false,
                 notify_change: NotifyChange::default(),
+                voting_sequence: VotingSequence::default(),
             },
         );
         debug!("generate_new_room - Room Name: {} - finished", room_name);
@@ -235,11 +237,7 @@ impl Game {
     /// Returns `Some(new_id)` when the sending player's seat (player ID) has
     /// changed — the caller must update its locally tracked player ID accordingly.
     /// Returns `None` for all other message types.
-    pub async fn process_client_message(
-        &self,
-        room: &str,
-        message: ClientMessage,
-    ) -> Option<usize> {
+    pub async fn process_client_message(&self, room: &str, message: ClientMessage) {
         debug!(
             "process_client_message - Room: {}, Message: {:?}",
             room, message
@@ -250,6 +248,7 @@ impl Game {
             players: Vec::new(),
             all_revealed: false,
             notify_change: NotifyChange::default(),
+            voting_sequence: VotingSequence::default(),
         });
 
         match message {
@@ -318,6 +317,20 @@ impl Game {
                     Some(new_seat)
                 } else {
                     None
+            }
+            ClientMessage::ChangeSequence {
+                player_id,
+                sequence,
+            } => {
+                // Only the captain (lowest active player_id) may change the sequence.
+                let min_id = room_state
+                    .players
+                    .iter()
+                    .filter(|p| p.player_id < 100)
+                    .map(|p| p.player_id)
+                    .min();
+                if Some(player_id) == min_id {
+                    room_state.voting_sequence = sequence;
                 }
             }
         }
@@ -762,5 +775,61 @@ mod tests {
         // The former captain (now player 3) retains their vote
         let former_captain = state.players.iter().find(|p| p.player_id == 3).unwrap();
         assert_eq!(former_captain.value, Some(5));
+    /// ChangeSequence updates the room's voting sequence when sent by the captain.
+    #[tokio::test]
+    async fn test_process_change_sequence_updates_voting_sequence() {
+        let game = new_game();
+        game.generate_new_room(Some("m-room-cs")).await;
+        game.new_player("m-room-cs").await; // id 0 – captain
+
+        // Default should be Fibonacci
+        let initial_state = game.get_room_state("m-room-cs").await.unwrap();
+        assert_eq!(initial_state.voting_sequence, VotingSequence::Fibonacci);
+
+        // Captain (id 0) changes to Linear
+        game.process_client_message(
+            "m-room-cs",
+            ClientMessage::ChangeSequence {
+                player_id: 0,
+                sequence: VotingSequence::Linear,
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cs").await.unwrap();
+        assert_eq!(state.voting_sequence, VotingSequence::Linear);
+
+        // Captain changes to SmMedLgXl
+        game.process_client_message(
+            "m-room-cs",
+            ClientMessage::ChangeSequence {
+                player_id: 0,
+                sequence: VotingSequence::SmMedLgXl,
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cs").await.unwrap();
+        assert_eq!(state.voting_sequence, VotingSequence::SmMedLgXl);
+    }
+
+    /// ChangeSequence sent by a non-captain is ignored.
+    #[tokio::test]
+    async fn test_process_change_sequence_ignored_for_non_captain() {
+        let game = new_game();
+        game.generate_new_room(Some("m-room-cs-nc")).await;
+        game.new_player("m-room-cs-nc").await; // id 0 – captain
+        game.new_player("m-room-cs-nc").await; // id 1 – non-captain
+
+        // Non-captain (id 1) attempts to change sequence
+        game.process_client_message(
+            "m-room-cs-nc",
+            ClientMessage::ChangeSequence {
+                player_id: 1,
+                sequence: VotingSequence::Linear,
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cs-nc").await.unwrap();
+        // Sequence must remain unchanged
+        assert_eq!(state.voting_sequence, VotingSequence::Fibonacci);
     }
 }
