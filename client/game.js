@@ -37,7 +37,7 @@ class Game {
       name: "",
       value: 0,
       previous_player_size: 0,
-      current_sequence: null,
+      current_sequence: "Fibonacci",
     };
     // Values must match the server-side values
     this.max_table_size = 12;
@@ -122,25 +122,31 @@ class Game {
   }
 
   update_vote_options(sequence_name) {
-    const sequence = VOTING_SEQUENCES[sequence_name];
-    if (!sequence) return;
-    const value_input = document.getElementById("player_value");
-    if (!value_input) return;
-    const current_value = parseInt(value_input.value);
-    value_input.replaceChildren();
-    const placeholder = document.createElement("option");
-    placeholder.value = "0";
-    placeholder.textContent = "Select a value";
-    value_input.appendChild(placeholder);
-    for (const item of sequence) {
-      const option = document.createElement("option");
-      option.value = item.value;
-      option.textContent = item.label;
-      value_input.appendChild(option);
+    try {
+      const sequence = VOTING_SEQUENCES[sequence_name];
+      const value_input = document.getElementById("player_value");
+      const current_value = parseInt(value_input.value);
+      value_input.replaceChildren();
+      const placeholder = document.createElement("option");
+      placeholder.value = "0";
+      placeholder.textContent = "Select a value";
+      value_input.appendChild(placeholder);
+      for (const item of sequence) {
+        const option = document.createElement("option");
+        option.value = item.value;
+        option.textContent = item.label;
+        value_input.appendChild(option);
+      }
+      value_input.value = sequence.some((item) => item.value === current_value) ? current_value : 0;
+    } catch (e) {
+      console.error("Failed to update vote options:", e);
     }
-    // Preserve selection if the value is still valid in the new sequence
-    const still_valid = sequence.some((item) => item.value === current_value);
-    value_input.value = still_valid ? current_value : 0;
+  }
+
+  get_display_label(value) {
+    const sequence = VOTING_SEQUENCES[this.local_state.current_sequence];
+    const item = sequence.find((item) => item.value === value);
+    return item ? item.label : String(value);
   }
 
   handle_reveal_button_click(local_state, ws) {
@@ -242,7 +248,7 @@ class Game {
     const current_size = this.server_state.players.length;
 
     // Update vote options if the sequence changed
-    const server_sequence = this.server_state.voting_sequence ?? "Fibonacci";
+    const server_sequence = this.server_state.voting_sequence;
     if (server_sequence !== this.local_state.current_sequence) {
       this.local_state.current_sequence = server_sequence;
       this.update_vote_options(server_sequence);
@@ -301,7 +307,9 @@ class Game {
           }
           if (player_value_element) {
             player_value_element.textContent =
-              this.server_state.all_revealed && player.value ? player.value : "?";
+              this.server_state.all_revealed && player.value
+                ? this.get_display_label(player.value)
+                : "?";
           }
         } else {
           // Reset name and value for vacant spots
@@ -341,7 +349,9 @@ class Game {
         if (player_value_element) {
           // Update the value only if revealed
           if (this.server_state.all_revealed) {
-            player_value_element.textContent = player.value ? player.value : "?";
+            player_value_element.textContent = player.value
+              ? this.get_display_label(player.value)
+              : "?";
           } else {
             player_value_element.textContent = "?";
           }

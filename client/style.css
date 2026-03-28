@@ -131,11 +131,17 @@ p { font-size: small; }
   filter: grayscale(100%);
 }
 
+.player-value {
+  container-type: inline-size;
+}
+
 .player-value > p {
-  font-size: 2rem;
+  font-size: clamp(0.75rem, 15cqw, 2rem);
   font-weight: bold;
   position: relative;
   z-index: 1;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 
@@ -172,7 +178,6 @@ p { font-size: small; }
   cursor: pointer;
   line-height: 1;
   padding: 0.25rem;
-  border-radius: var(--card-radius);
   transition: transform var(--transition-time) ease-in-out;
 }
 
