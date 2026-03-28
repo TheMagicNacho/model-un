@@ -278,7 +278,7 @@ p { font-size: small; }
     background-position: 0 center;
   }
   100% {
-    /* Traverse one full atlas width (7001px) to complete the spin loop. */
+    /* Traverse one full atlas width leftward (-7001px) to complete the spin loop. */
     background-position: -7001px center;
   }
 }
