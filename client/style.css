@@ -278,7 +278,7 @@ p { font-size: small; }
     background-position: 0 center;
   }
   100% {
-    /* Traverse one full atlas width leftward (-7001px matches atlas.png width) to complete the spin loop. */
+    /* Traverse one full atlas width leftward (-7001px; atlas.png is 7001px wide—update if the asset changes) to complete the spin loop. */
     background-position: -7001px center;
   }
 }
