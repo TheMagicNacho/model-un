@@ -106,10 +106,13 @@ impl GameWebSocket {
                                     serde_json::from_str::<ClientMessage>(text)
                             {
                                 debug!("Client Message: {:?}", client_message);
-                                if let Some(new_id) = game_state.process_client_message(&room, client_message).await {
-                                    player_id = new_id;
-                                }
+                                game_state.process_client_message(&room, client_message).await;
                                 if let Some(room_state) = game_state.get_room_state(&room).await {
+                                    // Detect a seat change for this connection via notify_change.
+                                    let nc = &room_state.notify_change;
+                                    if nc.current_id == player_id && nc.new_id != player_id {
+                                        player_id = nc.new_id;
+                                    }
                                     let _ = tx.send(RoomUpdate {
                                         room: room.to_string(),
                                         state: room_state.clone(),

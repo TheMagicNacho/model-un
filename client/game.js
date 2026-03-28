@@ -87,21 +87,7 @@ class Game {
         });
       }
     }
-  }
 
-  handle_seat_change(new_seat, ws) {
-    // Only switch if clicking a different, vacant seat
-    if (this.local_state.player_id === new_seat) return;
-    const is_vacant = !this.server_state.players?.some((p) => p.player_id === new_seat);
-    if (is_vacant) {
-      ws.send(
-        JSON.stringify({
-          type: "ChangeSeat",
-          player_id: this.local_state.player_id,
-          new_seat: new_seat,
-        }),
-      );
-    }
     // Captain's hamburger menu: open popup
     const captain_btn = document.getElementById("captain-menu-btn");
     captain_btn.addEventListener("click", () => {
@@ -134,6 +120,22 @@ class Game {
     document.getElementById("sequence-popup-close").addEventListener("click", () => {
       document.getElementById("sequence-popup").style.display = "none";
     });
+  }
+
+  handle_seat_change(new_seat, ws) {
+    // Only switch if clicking a different, vacant seat
+    if (this.local_state.player_id === new_seat) return;
+    const is_vacant = !this.server_state.players?.some((p) => p.player_id === new_seat);
+    if (is_vacant) {
+      ws.send(
+        JSON.stringify({
+          type: "ChangeSeat",
+          name: this.local_state.name,
+          current_id: this.local_state.player_id,
+          requested_id: new_seat,
+        }),
+      );
+    }
   }
 
   is_captain() {
@@ -408,7 +410,6 @@ class Game {
     const value_input = document.getElementById("player_value");
     const reveal_button = document.getElementById("reveal-button");
     const value_label = document.querySelector('label[for="player_value"]');
-    const is_captain = this.local_state.player_id === captain_id;
 
     if (this.local_state.player_id > this.overflow_index) {
       // Spectator Mode
@@ -433,10 +434,8 @@ class Game {
       }
     } else {
       if (value_input) value_input.style.visibility = "visible";
+      if (reveal_button) reveal_button.style.visibility = "visible";
       if (value_label) value_label.style.visibility = "visible";
-
-      // Only the captain can reveal/reset votes
-      if (reveal_button) reveal_button.style.display = is_captain ? "" : "none";
 
       if (document.getElementById("spectator-message")) {
         document.getElementById("spectator-message").remove();

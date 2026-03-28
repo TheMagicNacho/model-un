@@ -233,10 +233,6 @@ impl Game {
     }
 
     /// Process a message received from a client and update the room state.
-    ///
-    /// Returns `Some(new_id)` when the sending player's seat (player ID) has
-    /// changed — the caller must update its locally tracked player ID accordingly.
-    /// Returns `None` for all other message types.
     pub async fn process_client_message(&self, room: &str, message: ClientMessage) {
         debug!(
             "process_client_message - Room: {}, Message: {:?}",
@@ -254,7 +250,6 @@ impl Game {
         match message {
             ClientMessage::Pong { player_id } => {
                 debug!("Player {} ponged.", player_id);
-                None
             }
             ClientMessage::ChangeValue { player_id, value } => {
                 if let Some(player) = room_state
@@ -264,7 +259,6 @@ impl Game {
                 {
                     player.value = Some(value);
                 }
-                None
             }
             ClientMessage::ChangeName { player_id, name } => {
                 if let Some(player) = room_state
@@ -274,7 +268,6 @@ impl Game {
                 {
                     player.player_name = name;
                 }
-                None
             }
             ClientMessage::RevealNumbers { value } => {
                 // Only zero out the values if the user wants to reset and the
@@ -288,35 +281,39 @@ impl Game {
                 }
                 // Update the state
                 room_state.all_revealed = value;
-                None
             }
             ClientMessage::ChangeSeat {
-                player_id,
-                new_seat,
+                name,
+                current_id,
+                requested_id,
             } => {
                 let max_room_size = 12;
-                let is_valid = new_seat < max_room_size
-                    && room_state.players.iter().all(|p| p.player_id != new_seat);
+                let is_valid = requested_id < max_room_size
+                    && room_state
+                        .players
+                        .iter()
+                        .all(|p| p.player_id != requested_id);
 
                 if is_valid {
                     if let Some(player) = room_state
                         .players
                         .iter_mut()
-                        .find(|p| p.player_id == player_id)
+                        .find(|p| p.player_id == current_id)
                     {
-                        player.player_id = new_seat;
+                        player.player_id = requested_id;
+                        player.player_name = name;
                     }
                     room_state.notify_change = NotifyChange {
-                        current_id: player_id,
-                        new_id: new_seat,
+                        current_id,
+                        new_id: requested_id,
                     };
                     debug!(
                         "Player {} moved to seat {} in room {}",
-                        player_id, new_seat, room
+                        current_id, requested_id, room
                     );
-                    Some(new_seat)
                 } else {
-                    None
+                    room_state.notify_change = NotifyChange::default();
+                }
             }
             ClientMessage::ChangeSequence {
                 player_id,
@@ -621,7 +618,7 @@ mod tests {
 
     // ── Seat switching ───────────────────────────────────────────────────────
 
-    /// A player can move to a vacant seat within the active range (0-11).
+    /// Alice (id 0) moves to seat 3; assert that the player at id 3 is Alice.
     #[tokio::test]
     async fn test_change_seat_moves_player_to_vacant_seat() {
         let game = new_game();
@@ -629,25 +626,58 @@ mod tests {
         game.new_player("s-room-move").await; // id 0
         game.new_player("s-room-move").await; // id 1
 
-        let new_id = game
-            .process_client_message(
-                "s-room-move",
-                ClientMessage::ChangeSeat {
-                    player_id: 1,
-                    new_seat: 5,
-                },
-            )
-            .await;
+        // Name the players
+        game.process_client_message(
+            "s-room-move",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Alice".to_string(),
+            },
+        )
+        .await;
+        game.process_client_message(
+            "s-room-move",
+            ClientMessage::ChangeName {
+                player_id: 1,
+                name: "Bob".to_string(),
+            },
+        )
+        .await;
 
-        assert_eq!(new_id, Some(5));
+        // Assert starting positions
+        let pre = game.get_room_state("s-room-move").await.unwrap();
+        assert!(
+            pre.players
+                .iter()
+                .any(|p| p.player_id == 0 && p.player_name == "Alice")
+        );
+        assert!(
+            pre.players
+                .iter()
+                .any(|p| p.player_id == 1 && p.player_name == "Bob")
+        );
+
+        // Alice moves from seat 0 to seat 3
+        game.process_client_message(
+            "s-room-move",
+            ClientMessage::ChangeSeat {
+                name: "Alice".to_string(),
+                current_id: 0,
+                requested_id: 3,
+            },
+        )
+        .await;
+
         let state = game.get_room_state("s-room-move").await.unwrap();
-        assert!(state.players.iter().any(|p| p.player_id == 5));
-        assert!(state.players.iter().all(|p| p.player_id != 1));
-        assert_eq!(state.notify_change.current_id, 1);
-        assert_eq!(state.notify_change.new_id, 5);
+        // Alice should now be at seat 3
+        let alice = state.players.iter().find(|p| p.player_id == 3).unwrap();
+        assert_eq!(alice.player_name, "Alice");
+        // Bob should remain at seat 1
+        let bob = state.players.iter().find(|p| p.player_id == 1).unwrap();
+        assert_eq!(bob.player_name, "Bob");
     }
 
-    /// Moving to a seat already occupied by another player is rejected.
+    /// Alice (id 0) tries to take Bob's (id 1) seat; assert that id 0 is still Alice.
     #[tokio::test]
     async fn test_change_seat_rejects_occupied_seat() {
         let game = new_game();
@@ -655,20 +685,42 @@ mod tests {
         game.new_player("s-room-occupied").await; // id 0
         game.new_player("s-room-occupied").await; // id 1
 
-        let result = game
-            .process_client_message(
-                "s-room-occupied",
-                ClientMessage::ChangeSeat {
-                    player_id: 1,
-                    new_seat: 0, // seat 0 is taken
-                },
-            )
-            .await;
+        // Name the players
+        game.process_client_message(
+            "s-room-occupied",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Alice".to_string(),
+            },
+        )
+        .await;
+        game.process_client_message(
+            "s-room-occupied",
+            ClientMessage::ChangeName {
+                player_id: 1,
+                name: "Bob".to_string(),
+            },
+        )
+        .await;
 
-        assert_eq!(result, None);
+        // Alice attempts to take Bob's occupied seat
+        game.process_client_message(
+            "s-room-occupied",
+            ClientMessage::ChangeSeat {
+                name: "Alice".to_string(),
+                current_id: 0,
+                requested_id: 1, // seat 1 is Bob's
+            },
+        )
+        .await;
+
         let state = game.get_room_state("s-room-occupied").await.unwrap();
-        assert!(state.players.iter().any(|p| p.player_id == 1));
-        assert!(state.players.iter().any(|p| p.player_id == 0));
+        // Alice must still be at seat 0
+        let alice = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(alice.player_name, "Alice");
+        // Bob must still be at seat 1
+        let bob = state.players.iter().find(|p| p.player_id == 1).unwrap();
+        assert_eq!(bob.player_name, "Bob");
     }
 
     /// Moving to a seat index >= 12 (overflow zone) is rejected.
@@ -678,27 +730,30 @@ mod tests {
         game.generate_new_room(Some("s-room-overflow")).await;
         game.new_player("s-room-overflow").await; // id 0
 
-        let result = game
-            .process_client_message(
-                "s-room-overflow",
-                ClientMessage::ChangeSeat {
-                    player_id: 0,
-                    new_seat: 12,
-                },
-            )
-            .await;
+        game.process_client_message(
+            "s-room-overflow",
+            ClientMessage::ChangeSeat {
+                name: "Delegate Unknown".to_string(),
+                current_id: 0,
+                requested_id: 12,
+            },
+        )
+        .await;
 
-        assert_eq!(result, None);
         let state = game.get_room_state("s-room-overflow").await.unwrap();
         assert!(state.players.iter().any(|p| p.player_id == 0));
+        assert!(state.players.iter().all(|p| p.player_id != 12));
     }
 
-    /// After a seat change the player's name and value are preserved.
+    /// After a seat change the player's name follows them to the new seat.
     #[tokio::test]
     async fn test_change_seat_preserves_player_name_and_value() {
         let game = new_game();
         game.generate_new_room(Some("s-room-preserve")).await;
         game.new_player("s-room-preserve").await; // id 0
+        game.new_player("s-room-preserve").await; // id 1
+
+        // Name both players
         game.process_client_message(
             "s-room-preserve",
             ClientMessage::ChangeName {
@@ -709,31 +764,33 @@ mod tests {
         .await;
         game.process_client_message(
             "s-room-preserve",
-            ClientMessage::ChangeValue {
-                player_id: 0,
-                value: 8,
+            ClientMessage::ChangeName {
+                player_id: 1,
+                name: "Bob".to_string(),
             },
         )
         .await;
 
+        // Alice moves to seat 3
         game.process_client_message(
             "s-room-preserve",
             ClientMessage::ChangeSeat {
-                player_id: 0,
-                new_seat: 3,
+                name: "Alice".to_string(),
+                current_id: 0,
+                requested_id: 3,
             },
         )
         .await;
 
         let state = game.get_room_state("s-room-preserve").await.unwrap();
-        let player = state.players.iter().find(|p| p.player_id == 3).unwrap();
-        assert_eq!(player.player_name, "Alice");
-        assert_eq!(player.value, Some(8));
+        // The player at seat 3 should be Alice
+        let alice = state.players.iter().find(|p| p.player_id == 3).unwrap();
+        assert_eq!(alice.player_name, "Alice");
     }
 
     /// The captain is the active player with the lowest player_id.
     /// After a seat change that gives another player the lowest seat, captainhood
-    /// transfers and values are unchanged (sequence preserved).
+    /// transfers and votes are unchanged.
     #[tokio::test]
     async fn test_captain_transfers_on_seat_change() {
         let game = new_game();
@@ -755,8 +812,9 @@ mod tests {
         game.process_client_message(
             "s-room-captain",
             ClientMessage::ChangeSeat {
-                player_id: 0,
-                new_seat: 3,
+                name: "Delegate Unknown".to_string(),
+                current_id: 0,
+                requested_id: 3,
             },
         )
         .await;
@@ -775,6 +833,10 @@ mod tests {
         // The former captain (now player 3) retains their vote
         let former_captain = state.players.iter().find(|p| p.player_id == 3).unwrap();
         assert_eq!(former_captain.value, Some(5));
+    }
+
+    // ── Voting sequence ──────────────────────────────────────────────────────
+
     /// ChangeSequence updates the room's voting sequence when sent by the captain.
     #[tokio::test]
     async fn test_process_change_sequence_updates_voting_sequence() {

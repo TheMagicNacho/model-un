@@ -17,15 +17,6 @@ pub struct PlayerState {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
-<<<<<<< HEAD
-pub struct GameState {
-    pub players: Vec<PlayerState>,
-    pub all_revealed: bool,
-    pub notify_change: NotifyChange,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
-=======
 pub enum VotingSequence {
     #[default]
     Fibonacci,
@@ -42,7 +33,6 @@ pub struct GameState {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
->>>>>>> origin/main
 pub struct NotifyChange {
     pub current_id: usize,
     pub new_id: usize,
@@ -52,11 +42,29 @@ pub struct NotifyChange {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum ClientMessage {
-    ChangeValue { player_id: usize, value: u8 },
-    ChangeName { player_id: usize, name: String },
-    RevealNumbers { value: bool },
-    Pong { player_id: usize },
-    ChangeSeat { player_id: usize, new_seat: usize },
+    ChangeValue {
+        player_id: usize,
+        value: u8,
+    },
+    ChangeName {
+        player_id: usize,
+        name: String,
+    },
+    RevealNumbers {
+        value: bool,
+    },
+    ChangeSequence {
+        player_id: usize,
+        sequence: VotingSequence,
+    },
+    Pong {
+        player_id: usize,
+    },
+    ChangeSeat {
+        name: String,
+        current_id: usize,
+        requested_id: usize,
+    },
 }
 
 // The JSON from the server to the client.
