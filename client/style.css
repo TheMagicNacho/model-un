@@ -12,7 +12,8 @@
   --portrait-offset: 14.4vw;
   --globe-glow: rgba(148, 93, 255, 0.35);
   --globe-shadow: rgba(5, 15, 28, 0.6);
-  --atlas-width: 7001px; /* atlas.png intrinsic width */
+  /* atlas.png intrinsic width (update if atlas is regenerated). */
+  --atlas-width: 7001px;
   --globe-size: 120vmin;
   --globe-tilt-x: 8deg;
   --globe-tilt-y: 6deg;
@@ -285,6 +286,6 @@ p { font-size: small; }
   }
   100% {
     /* Traverse one full atlas width leftward to complete the spin loop. */
-    background-position: calc(-1 * var(--atlas-width)) center;
+    background-position: calc(var(--atlas-width) * -1) center;
   }
 }
