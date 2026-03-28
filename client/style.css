@@ -12,8 +12,10 @@
   --portrait-offset: 14.4vw;
   --globe-glow: rgba(148, 93, 255, 0.35);
   --globe-shadow: rgba(5, 15, 28, 0.6);
-  --atlas-width: 7001px;
+  --atlas-width: 7001px; /* atlas.png intrinsic width */
   --globe-size: 120vmin;
+  --globe-tilt-x: 8deg;
+  --globe-tilt-y: 6deg;
 }
 
 * {
@@ -257,8 +259,8 @@ p { font-size: small; }
   background-repeat: repeat-x;
   background-size: var(--atlas-width) auto; /* Match atlas width so the loop distance aligns with the texture. */
   animation: rotateglobe 432s linear 0s infinite;
-  /* Keep the atlas upright (rotateZ removed after centering) and tilt slightly for depth. */
-  transform: translate(-50%, -50%) rotateX(8deg) rotateY(6deg);
+  /* Keep the atlas upright (rotateZ removed after centering) and tilt slightly for depth (8deg X gives stronger shading when centered). */
+  transform: translate(-50%, -50%) rotateX(var(--globe-tilt-x)) rotateY(var(--globe-tilt-y));
   position: fixed;
   top: 50%;
   left: 50%;
