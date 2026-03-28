@@ -12,10 +12,9 @@
   --portrait-offset: 14.4vw;
   --globe-glow: rgba(148, 93, 255, 0.35);
   --globe-shadow: rgba(5, 15, 28, 0.6);
-  /* atlas.png intrinsic width (update if atlas is regenerated). */
-  --atlas-width: 7001px;
+  --atlas-width: 2071px;
   --globe-size: 120vmin;
-  --globe-tilt-x: 8deg;
+  --globe-tilt-x: 27deg;
   --globe-tilt-y: 6deg;
 }
 
@@ -56,7 +55,6 @@ p { font-size: small; }
   padding: 20px;
   width: 100vw;
   height: 100vh;
-  z-index: 1;
 }
 
 .table-area {
@@ -154,6 +152,7 @@ p { font-size: small; }
   display: flex;
   flex-direction: column;
   width: 100%;
+  opacity: 0.95;
   padding: 1rem;
   background: var(--control-bg);
   border-radius: var(--card-radius);
@@ -253,8 +252,8 @@ p { font-size: small; }
    GLOBE
    ===================== */
 .globe {
-  filter: blur(2px);
-  z-index: 0;
+  filter: blur(3px);
+  z-index: -1;
   background: radial-gradient(circle at center, var(--globe-glow) 0%, var(--globe-shadow) 65%), url("img/atlas.png");
   background-blend-mode: screen;
   background-repeat: repeat-x;
@@ -263,11 +262,10 @@ p { font-size: small; }
   /* Keep the atlas upright (rotateZ removed entirely) and tilt slightly for depth (8deg X gives stronger shading when centered). */
   transform: translate(-50%, -50%) rotateX(var(--globe-tilt-x)) rotateY(var(--globe-tilt-y));
   position: fixed;
-  top: 50%;
+  top: 71%;
   left: 50%;
-  /* Slightly oversize to keep the glow fully visible on tall or wide viewports. */
-  width: var(--globe-size);
-  height: var(--globe-size);
+  width: 86%;
+  height: 140%;
   border-radius: 50%;
   box-shadow:
     inset 0 0 50px #fff,
