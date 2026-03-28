@@ -10,6 +10,9 @@
   --hover-scale: 1.5;
   --transition-time: 0.4s;
   --portrait-offset: 14.4vw;
+  --globe-glow: rgba(148, 93, 255, 0.35);
+  --globe-shadow: rgba(5, 15, 28, 0.6);
+  --atlas-width: 7001px;
 }
 
 * {
@@ -248,7 +251,7 @@ p { font-size: small; }
 .globe {
   filter: blur(2px);
   z-index: 0;
-  background: radial-gradient(circle at center, rgba(148, 93, 255, 0.35) 0%, rgba(5, 15, 28, 0.6) 65%), url("img/atlas.png");
+  background: radial-gradient(circle at center, var(--globe-glow) 0%, var(--globe-shadow) 65%), url("img/atlas.png");
   background-blend-mode: screen;
   background-repeat: repeat-x;
   background-size: 200% auto; /* Upscale the texture to keep details soft while filling the glow. */
@@ -278,7 +281,7 @@ p { font-size: small; }
     background-position: 0 center;
   }
   100% {
-    /* Traverse one full atlas width leftward (-7001px; atlas.png is 7001px wide—update if the asset changes) to complete the spin loop. */
-    background-position: -7001px center;
+    /* Traverse one full atlas width leftward to complete the spin loop. */
+    background-position: calc(-1 * var(--atlas-width)) center;
   }
 }
