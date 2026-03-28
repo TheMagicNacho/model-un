@@ -10,6 +10,12 @@
   --hover-scale: 1.5;
   --transition-time: 0.4s;
   --portrait-offset: 14.4vw;
+  --globe-glow: rgba(148, 93, 255, 0.35);
+  --globe-shadow: rgba(5, 15, 28, 0.6);
+  --atlas-width: 2071px;
+  --globe-size: 120vmin;
+  --globe-tilt-x: 27deg;
+  --globe-tilt-y: 6deg;
 }
 
 * {
@@ -45,7 +51,7 @@ p { font-size: small; }
 .game-container {
   display: flex;
   flex-direction: column;
-  position: absolute;
+  position: relative;
   padding: 20px;
   width: 100vw;
   height: 100vh;
@@ -152,6 +158,7 @@ p { font-size: small; }
   display: flex;
   flex-direction: column;
   width: 100%;
+  opacity: 0.95;
   padding: 1rem;
   background: var(--control-bg);
   border-radius: var(--card-radius);
@@ -325,17 +332,20 @@ p { font-size: small; }
    GLOBE
    ===================== */
 .globe {
-  filter: blur(2px);
+  filter: blur(3px);
   z-index: -1;
-  background: url("img/atlas.png");
-  background-size: cover;
+  background: radial-gradient(circle at center, var(--globe-glow) 0%, var(--globe-shadow) 65%), url("img/atlas.png");
+  background-blend-mode: screen;
+  background-repeat: repeat-x;
+  background-size: var(--atlas-width) auto; /* Match atlas width so the loop distance aligns with the texture. */
   animation: rotateglobe 432s linear 0s infinite;
-  transform: rotateX(6deg) rotateY(6deg) rotateZ(6deg);
-  position: absolute;
-  top: 37vh;
-  left: 1vw;
-  width: 100vw;
-  height: 100vh;
+  /* Keep the atlas upright (rotateZ removed entirely) and tilt slightly for depth (8deg X gives stronger shading when centered). */
+  transform: translate(-50%, -50%) rotateX(var(--globe-tilt-x)) rotateY(var(--globe-tilt-y));
+  position: fixed;
+  top: 71%;
+  left: 50%;
+  width: 86%;
+  height: 140%;
   border-radius: 50%;
   box-shadow:
     inset 0 0 50px #fff,
@@ -350,9 +360,10 @@ p { font-size: small; }
 
 @keyframes rotateglobe {
   0% {
-    background-position: 0 951px;
+    background-position: 0 center;
   }
   100% {
-    background-position: 6800px 600px;
+    /* Traverse one full atlas width leftward to complete the spin loop. */
+    background-position: calc(var(--atlas-width) * -1) center;
   }
 }
