@@ -92,7 +92,7 @@ impl GameWebSocket {
         let mut ws_tx = connection_context.ws_tx;
         let mut ws_rx = connection_context.ws_rx;
 
-        // Track current player_id; it may change if the player switches seats.
+        // Track current player_id; seat changes are resolved via game_state.resolve_player_id.
         let mut player_id = player_id;
 
         loop {
@@ -107,12 +107,10 @@ impl GameWebSocket {
                             {
                                 debug!("Client Message: {:?}", client_message);
                                 game_state.process_client_message(&room, client_message).await;
+                                // Delegate seat-change detection to the game module so that
+                                // interface.rs remains responsible for socket I/O only.
+                                player_id = game_state.resolve_player_id(&room, player_id).await;
                                 if let Some(room_state) = game_state.get_room_state(&room).await {
-                                    // Detect a seat change for this connection via notify_change.
-                                    let nc = &room_state.notify_change;
-                                    if nc.current_id == player_id && nc.new_id != player_id {
-                                        player_id = nc.new_id;
-                                    }
                                     let _ = tx.send(RoomUpdate {
                                         room: room.to_string(),
                                         state: room_state.clone(),

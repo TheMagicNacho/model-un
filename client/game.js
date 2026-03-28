@@ -78,29 +78,21 @@ class Game {
       this.handle_reveal_button_click(this.local_state, ws);
     });
 
-    // Add click handlers to all player card slots for seat switching
+    // Add click handlers to all player card slots for seat switching.
+    // If the clicking player is the captain and clicks their own card, open the
+    // voting-sequence popup instead of attempting a seat switch.
     for (let i = 0; i < this.max_table_size; i++) {
       const player_card = document.getElementById(`player${i}id`);
       if (player_card) {
         player_card.addEventListener("click", () => {
-          this.handle_seat_change(i, ws);
+          if (i === this.local_state.player_id && this.is_captain()) {
+            this.open_sequence_popup();
+          } else {
+            this.handle_seat_change(i, ws);
+          }
         });
       }
     }
-
-    // Captain's hamburger menu: open popup
-    const captain_btn = document.getElementById("captain-menu-btn");
-    captain_btn.addEventListener("click", () => {
-      const popup = document.getElementById("sequence-popup");
-      popup.style.display = "flex";
-      // Highlight the currently active sequence
-      document.querySelectorAll(".sequence-option").forEach((btn) => {
-        btn.classList.toggle(
-          "active",
-          btn.dataset.sequence === (this.server_state.voting_sequence ?? "Fibonacci"),
-        );
-      });
-    });
 
     // Sequence option buttons: send ChangeSequence and close popup
     document.querySelectorAll(".sequence-option").forEach((btn) => {
@@ -119,6 +111,18 @@ class Game {
     // Close button
     document.getElementById("sequence-popup-close").addEventListener("click", () => {
       document.getElementById("sequence-popup").style.display = "none";
+    });
+  }
+
+  open_sequence_popup() {
+    const popup = document.getElementById("sequence-popup");
+    popup.style.display = "flex";
+    // Highlight the currently active sequence
+    document.querySelectorAll(".sequence-option").forEach((btn) => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.sequence === (this.server_state.voting_sequence ?? "Fibonacci"),
+      );
     });
   }
 
@@ -288,12 +292,6 @@ class Game {
       this.update_vote_options(server_sequence);
     }
 
-    // Show the hamburger menu only to the captain
-    const captain_btn = document.getElementById("captain-menu-btn");
-    if (captain_btn) {
-      captain_btn.style.display = this.is_captain() ? "block" : "none";
-    }
-
     const tableArea = document.getElementsByClassName("table-area")[0];
     if (tableArea && current_size > 6 && current_size !== this.local_state.previous_player_size) {
       tableArea.classList.add("compact");
@@ -326,6 +324,7 @@ class Game {
         player_card_element.classList.remove("player-ready");
         player_card_element.classList.add("player-vacant");
         player_card_element.classList.remove("player-captain");
+        player_card_element.classList.remove("player-captain-self");
 
         // Find if there's a player for this position
         const player = this.server_state.players.find((p) => p.player_id === i);
@@ -338,6 +337,12 @@ class Game {
           }
           if (player.player_id === captain_id) {
             player_card_element.classList.add("player-captain");
+            // player-captain-self marks the local player's card when they are
+            // captain — the CSS uses it to show cursor:pointer and a grow effect
+            // on crown hover, and the click handler uses it to open the popup.
+            if (player.player_id === this.local_state.player_id) {
+              player_card_element.classList.add("player-captain-self");
+            }
           }
 
           if (player_name_element) {

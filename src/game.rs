@@ -287,6 +287,9 @@ impl Game {
                 current_id,
                 requested_id,
             } => {
+                // A seat change is only valid when the requested seat is within
+                // the active range (0–11) AND is not already occupied.  Spectator
+                // slots (≥ 100) and out-of-range indices are always rejected.
                 let max_room_size = 12;
                 let is_valid = requested_id < max_room_size
                     && room_state
@@ -295,6 +298,12 @@ impl Game {
                         .all(|p| p.player_id != requested_id);
 
                 if is_valid {
+                    // The existing PlayerState is mutated in-place: its player_id
+                    // is updated to the requested seat and the name from the
+                    // message is applied so it follows the player across seats.
+                    // The old seat simply ceases to exist — no separate cleanup
+                    // step is needed because the player object is identified by
+                    // its player_id field, not by position in the Vec.
                     if let Some(player) = room_state
                         .players
                         .iter_mut()
@@ -332,6 +341,24 @@ impl Game {
             }
         }
     }
+
+    /// Returns the player's current seat ID after a potential seat change.
+    ///
+    /// After calling `process_client_message`, the caller can pass the
+    /// player's locally tracked ID here.  If `notify_change` records that this
+    /// exact player moved (i.e. `current_id` matches and `new_id` differs),
+    /// the updated seat ID is returned.  Otherwise the original ID is returned
+    /// unchanged.  This keeps all game-state comparisons inside the game module
+    /// so that `interface.rs` only handles socket I/O.
+    pub async fn resolve_player_id(&self, room: &str, current_id: usize) -> usize {
+        if let Some(state) = self.game_state.read().await.get(room) {
+            let nc = &state.notify_change;
+            if nc.current_id == current_id && nc.new_id != current_id {
+                return nc.new_id;
+            }
+        }
+        current_id
+    }
 }
 
 #[cfg(test)]
@@ -345,8 +372,8 @@ mod tests {
 
     // ── Room management ──────────────────────────────────────────────────────
 
-    /// Generating a room with a given name stores an empty GameState for that
-    /// name.
+    /// Rule: a room created with a given name is immediately visible in state
+    /// with an empty player list and `all_revealed = false`.
     #[tokio::test]
     async fn test_generate_new_room_creates_empty_room() {
         let game = new_game();
@@ -357,14 +384,16 @@ mod tests {
         assert!(!state.all_revealed);
     }
 
-    /// Calling get_room_state for a room that was never created returns None.
+    /// Rule: querying a room that has never been created must return `None`
+    /// (no implicit room creation).
     #[tokio::test]
     async fn test_get_room_state_returns_none_for_nonexistent_room() {
         let game = new_game();
         assert!(game.get_room_state("does-not-exist").await.is_none());
     }
 
-    /// random_name_generator produces a non-empty string.
+    /// Rule: room name generation must always produce a usable (non-empty)
+    /// string so that clients can identify their room.
     #[tokio::test]
     async fn test_random_name_generator_returns_nonempty_string() {
         let game = new_game();
@@ -374,7 +403,8 @@ mod tests {
 
     // ── Player ID assignment ─────────────────────────────────────────────────
 
-    /// The very first player in a brand-new room receives ID 0.
+    /// Rule: the very first player in a new room always receives ID 0 so that
+    /// they immediately become the captain (lowest active ID).
     #[tokio::test]
     async fn test_new_player_in_new_room_gets_id_zero() {
         let game = new_game();
@@ -385,7 +415,8 @@ mod tests {
         assert_eq!(state.players[0].player_id, 0);
     }
 
-    /// Subsequent players receive sequential IDs.
+    /// Rule: players joining a room receive consecutive IDs starting at 0 so
+    /// that the seat layout is always predictable.
     #[tokio::test]
     async fn test_new_player_assigns_sequential_ids() {
         let game = new_game();
@@ -395,7 +426,8 @@ mod tests {
         assert_eq!(game.new_player("p-room-seq").await, 2);
     }
 
-    /// After a player is removed the lowest vacant ID is reused.
+    /// Rule: when a seat is vacated the lowest-numbered empty slot is reused
+    /// for the next joining player to keep IDs compact.
     #[tokio::test]
     async fn test_new_player_reuses_lowest_available_id() {
         let game = new_game();
@@ -408,8 +440,8 @@ mod tests {
         assert_eq!(game.new_player("p-room-reuse").await, 1);
     }
 
-    /// New players get an overflow ID (≥ 100) when the room already has 12
-    /// players.
+    /// Rule: once all 12 active seats are filled, additional players are placed
+    /// in spectator mode and receive an overflow ID (≥ 100).
     #[tokio::test]
     async fn test_new_player_overflow_id_when_room_full() {
         let game = new_game();
@@ -424,7 +456,8 @@ mod tests {
         );
     }
 
-    /// A new player starts with the default name and no value.
+    /// Rule: new players start with a placeholder name ("Delegate Unknown") and
+    /// no vote value so that the UI can distinguish un-named players.
     #[tokio::test]
     async fn test_new_player_has_default_name_and_no_value() {
         let game = new_game();
@@ -437,7 +470,8 @@ mod tests {
 
     // ── Player removal ───────────────────────────────────────────────────────
 
-    /// Removing a player by ID reduces the player list by one.
+    /// Rule: removing a player by ID must eliminate exactly that player from
+    /// the roster; all remaining players are unaffected.
     #[tokio::test]
     async fn test_remove_player_removes_player() {
         let game = new_game();
@@ -450,8 +484,8 @@ mod tests {
         assert!(state.players.iter().all(|p| p.player_id != 0));
     }
 
-    /// When 12 active players are present plus a spectating player (ID ≥ 100),
-    /// removing an active player promotes the spectator into the vacant slot.
+    /// Rule: when a full room (12 players) loses a member, the first waiting
+    /// spectator is automatically promoted to fill the vacant seat.
     #[tokio::test]
     async fn test_remove_player_promotes_waiting_player() {
         let game = new_game();
@@ -477,8 +511,8 @@ mod tests {
         assert_eq!(state.notify_change.new_id, 0);
     }
 
-    /// When fewer than 12 players remain but no spectator exists, no promotion
-    /// occurs.
+    /// Rule: when the room is not full and has no spectators, removing a player
+    /// leaves `notify_change` at its zero values (no promotion event).
     #[tokio::test]
     async fn test_remove_player_no_promotion_with_small_room() {
         let game = new_game();
@@ -494,7 +528,8 @@ mod tests {
 
     // ── Message processing ───────────────────────────────────────────────────
 
-    /// ChangeValue updates the player's stored value.
+    /// Rule: a ChangeValue message updates only the sending player's stored
+    /// vote; other players in the room are unaffected.
     #[tokio::test]
     async fn test_process_change_value_updates_player_value() {
         let game = new_game();
@@ -513,7 +548,8 @@ mod tests {
         assert_eq!(player.value, Some(5));
     }
 
-    /// ChangeName updates the player's display name.
+    /// Rule: a ChangeName message updates only the sending player's display
+    /// name; other players in the room are unaffected.
     #[tokio::test]
     async fn test_process_change_name_updates_player_name() {
         let game = new_game();
@@ -532,7 +568,8 @@ mod tests {
         assert_eq!(player.player_name, "Alice");
     }
 
-    /// RevealNumbers { true } sets all_revealed to true.
+    /// Rule: RevealNumbers { true } transitions the room into the revealed
+    /// state so that all clients can display vote values.
     #[tokio::test]
     async fn test_process_reveal_numbers_sets_all_revealed() {
         let game = new_game();
@@ -546,8 +583,8 @@ mod tests {
         assert!(state.all_revealed);
     }
 
-    /// RevealNumbers { false } after a reveal resets every player's value to 0
-    /// and clears all_revealed.
+    /// Rule: RevealNumbers { false } after a reveal clears `all_revealed` and
+    /// resets every player's vote to 0, starting a fresh voting round.
     #[tokio::test]
     async fn test_process_reveal_numbers_false_resets_values() {
         let game = new_game();
@@ -577,8 +614,8 @@ mod tests {
         assert_eq!(player.value, Some(0));
     }
 
-    /// RevealNumbers { false } when numbers were never revealed does not reset
-    /// values.
+    /// Rule: RevealNumbers { false } when no reveal has occurred yet must NOT
+    /// reset existing votes, as no voting round has completed.
     #[tokio::test]
     async fn test_hide_without_prior_reveal_keeps_values() {
         let game = new_game();
@@ -603,7 +640,8 @@ mod tests {
         assert_eq!(player.value, Some(3));
     }
 
-    /// Pong does not alter game state.
+    /// Rule: a Pong message is a keep-alive reply and must never modify any
+    /// game state.
     #[tokio::test]
     async fn test_process_pong_is_noop() {
         let game = new_game();
@@ -618,7 +656,8 @@ mod tests {
 
     // ── Seat switching ───────────────────────────────────────────────────────
 
-    /// Alice (id 0) moves to seat 3; assert that the player at id 3 is Alice.
+    /// Rule: a player may move to any vacant seat in the range 0–11.  Their
+    /// name travels with them and the old seat becomes vacant.
     #[tokio::test]
     async fn test_change_seat_moves_player_to_vacant_seat() {
         let game = new_game();
@@ -677,7 +716,8 @@ mod tests {
         assert_eq!(bob.player_name, "Bob");
     }
 
-    /// Alice (id 0) tries to take Bob's (id 1) seat; assert that id 0 is still Alice.
+    /// Rule: a ChangeSeat request targeting an occupied seat is silently
+    /// ignored; both players remain at their original seats.
     #[tokio::test]
     async fn test_change_seat_rejects_occupied_seat() {
         let game = new_game();
@@ -723,7 +763,8 @@ mod tests {
         assert_eq!(bob.player_name, "Bob");
     }
 
-    /// Moving to a seat index >= 12 (overflow zone) is rejected.
+    /// Rule: seat IDs ≥ 12 fall in the spectator/overflow zone and must be
+    /// rejected; the requesting player stays at their current seat.
     #[tokio::test]
     async fn test_change_seat_rejects_overflow_seat() {
         let game = new_game();
@@ -745,7 +786,9 @@ mod tests {
         assert!(state.players.iter().all(|p| p.player_id != 12));
     }
 
-    /// After a seat change the player's name follows them to the new seat.
+    /// Rule: when a player changes seats, the name supplied in the ChangeSeat
+    /// message is assigned to the new seat so the player's identity follows
+    /// them.
     #[tokio::test]
     async fn test_change_seat_preserves_player_name_and_value() {
         let game = new_game();
@@ -788,17 +831,36 @@ mod tests {
         assert_eq!(alice.player_name, "Alice");
     }
 
-    /// The captain is the active player with the lowest player_id.
-    /// After a seat change that gives another player the lowest seat, captainhood
-    /// transfers and votes are unchanged.
+    /// Rule: captainship belongs to the active player with the lowest seat ID.
+    /// When a captain moves to a higher-numbered seat, the player who now holds
+    /// the lowest ID becomes the new captain.  Existing votes are unaffected by
+    /// the transfer.
     #[tokio::test]
     async fn test_captain_transfers_on_seat_change() {
         let game = new_game();
         game.generate_new_room(Some("s-room-captain")).await;
-        game.new_player("s-room-captain").await; // id 0 (captain)
+        game.new_player("s-room-captain").await; // id 0
         game.new_player("s-room-captain").await; // id 1
 
-        // Give player 0 a vote
+        // Name the players
+        game.process_client_message(
+            "s-room-captain",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Alice".to_string(),
+            },
+        )
+        .await;
+        game.process_client_message(
+            "s-room-captain",
+            ClientMessage::ChangeName {
+                player_id: 1,
+                name: "Bob".to_string(),
+            },
+        )
+        .await;
+
+        // Alice (id 0) is captain; give her a vote so we can prove it survives
         game.process_client_message(
             "s-room-captain",
             ClientMessage::ChangeValue {
@@ -808,11 +870,11 @@ mod tests {
         )
         .await;
 
-        // Player 0 (captain) moves to seat 3, relinquishing captainhood to player 1
+        // Alice moves to seat 3; Bob (id 1) now holds the lowest ID
         game.process_client_message(
             "s-room-captain",
             ClientMessage::ChangeSeat {
-                name: "Delegate Unknown".to_string(),
+                name: "Alice".to_string(),
                 current_id: 0,
                 requested_id: 3,
             },
@@ -820,7 +882,7 @@ mod tests {
         .await;
 
         let state = game.get_room_state("s-room-captain").await.unwrap();
-        // Player 1 now holds the lowest ID — they are the new captain
+        // Bob (id 1) is now the captain — lowest active ID
         let min_id = state
             .players
             .iter()
@@ -829,15 +891,20 @@ mod tests {
             .min()
             .unwrap();
         assert_eq!(min_id, 1);
+        let bob = state.players.iter().find(|p| p.player_id == 1).unwrap();
+        assert_eq!(bob.player_name, "Bob");
 
-        // The former captain (now player 3) retains their vote
-        let former_captain = state.players.iter().find(|p| p.player_id == 3).unwrap();
-        assert_eq!(former_captain.value, Some(5));
+        // Alice retains her vote at the new seat
+        let alice = state.players.iter().find(|p| p.player_id == 3).unwrap();
+        assert_eq!(alice.player_name, "Alice");
+        assert_eq!(alice.value, Some(5));
     }
 
     // ── Voting sequence ──────────────────────────────────────────────────────
 
-    /// ChangeSequence updates the room's voting sequence when sent by the captain.
+    /// Rule: only the captain (lowest active seat ID) may change the voting
+    /// sequence.  The sequence is updated immediately and broadcast to all
+    /// clients via the next state update.
     #[tokio::test]
     async fn test_process_change_sequence_updates_voting_sequence() {
         let game = new_game();
@@ -873,15 +940,76 @@ mod tests {
         assert_eq!(state.voting_sequence, VotingSequence::SmMedLgXl);
     }
 
-    /// ChangeSequence sent by a non-captain is ignored.
+    /// Rule: captainship transfers when a player moves to a higher-numbered
+    /// seat.  After the transfer, only the new captain (Bob) may change the
+    /// voting sequence; the former captain (Alice) is ignored.
     #[tokio::test]
     async fn test_process_change_sequence_ignored_for_non_captain() {
         let game = new_game();
         game.generate_new_room(Some("m-room-cs-nc")).await;
-        game.new_player("m-room-cs-nc").await; // id 0 – captain
-        game.new_player("m-room-cs-nc").await; // id 1 – non-captain
+        game.new_player("m-room-cs-nc").await; // id 0
+        game.new_player("m-room-cs-nc").await; // id 1
 
-        // Non-captain (id 1) attempts to change sequence
+        // Name the players
+        game.process_client_message(
+            "m-room-cs-nc",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Alice".to_string(),
+            },
+        )
+        .await;
+        game.process_client_message(
+            "m-room-cs-nc",
+            ClientMessage::ChangeName {
+                player_id: 1,
+                name: "Bob".to_string(),
+            },
+        )
+        .await;
+
+        // Alice (id 0) is currently captain; move her to seat 3 so Bob (id 1)
+        // becomes the new captain.
+        game.process_client_message(
+            "m-room-cs-nc",
+            ClientMessage::ChangeSeat {
+                name: "Alice".to_string(),
+                current_id: 0,
+                requested_id: 3,
+            },
+        )
+        .await;
+
+        // Verify the seat change succeeded and captainship transferred.
+        let state = game.get_room_state("m-room-cs-nc").await.unwrap();
+        let alice = state
+            .players
+            .iter()
+            .find(|p| p.player_name == "Alice")
+            .unwrap();
+        assert_eq!(alice.player_id, 3, "Alice should now be at seat 3");
+        let captain_id = state
+            .players
+            .iter()
+            .filter(|p| p.player_id < 100)
+            .map(|p| p.player_id)
+            .min()
+            .unwrap();
+        assert_eq!(captain_id, 1, "Bob (id 1) should now be the captain");
+
+        // Alice (now at id 3) attempts to change the sequence – should be ignored.
+        game.process_client_message(
+            "m-room-cs-nc",
+            ClientMessage::ChangeSequence {
+                player_id: 3,
+                sequence: VotingSequence::SmMedLgXl,
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cs-nc").await.unwrap();
+        assert_eq!(state.voting_sequence, VotingSequence::Fibonacci);
+
+        // Bob (id 1, the new captain) changes the sequence to Linear.
         game.process_client_message(
             "m-room-cs-nc",
             ClientMessage::ChangeSequence {
@@ -891,7 +1019,6 @@ mod tests {
         )
         .await;
         let state = game.get_room_state("m-room-cs-nc").await.unwrap();
-        // Sequence must remain unchanged
-        assert_eq!(state.voting_sequence, VotingSequence::Fibonacci);
+        assert_eq!(state.voting_sequence, VotingSequence::Linear);
     }
 }

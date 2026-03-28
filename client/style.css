@@ -142,9 +142,23 @@ p { font-size: small; }
   content: "👑";
   position: absolute;
   top: 0.4rem;
-  left: 0.4rem;
-  font-size: 1.2rem;
+  right: 0.4rem;
+  font-size: 2rem;
   line-height: 1;
+  transform: rotate(15deg);
+  transform-origin: center center;
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Only the local captain's card gets cursor: pointer on the crown.
+   The player-captain-self class is applied in JS when this card
+   belongs to the current user and they hold the lowest active seat ID. */
+.player-captain-self {
+  cursor: pointer;
+}
+
+.player-captain-self:hover::after {
+  transform: rotate(15deg) scale(1.4);
 }
 
 .player-value {
@@ -185,22 +199,6 @@ p { font-size: small; }
     10px 0 80px #0ff;
 }
 
-.captain-menu-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0.25rem;
-  transition: transform var(--transition-time) ease-in-out;
-}
-
-.captain-menu-btn:hover {
-  transform: scale(1.2);
-}
 
 .sequence-popup {
   position: fixed;
