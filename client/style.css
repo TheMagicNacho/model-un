@@ -45,10 +45,11 @@ p { font-size: small; }
 .game-container {
   display: flex;
   flex-direction: column;
-  position: absolute;
+  position: relative;
   padding: 20px;
   width: 100vw;
   height: 100vh;
+  z-index: 1;
 }
 
 .table-area {
@@ -246,16 +247,18 @@ p { font-size: small; }
    ===================== */
 .globe {
   filter: blur(2px);
-  z-index: -1;
-  background: url("img/atlas.png");
-  background-size: cover;
+  z-index: 0;
+  background: radial-gradient(circle at center, rgba(148, 93, 255, 0.35) 0%, rgba(5, 15, 28, 0.6) 65%), url("img/atlas.png");
+  background-blend-mode: screen;
+  background-repeat: repeat-x;
+  background-size: 200% auto;
   animation: rotateglobe 432s linear 0s infinite;
-  transform: rotateX(6deg) rotateY(6deg) rotateZ(6deg);
-  position: absolute;
-  top: 37vh;
-  left: 1vw;
-  width: 100vw;
-  height: 100vh;
+  transform: translate(-50%, -50%) rotateX(8deg) rotateY(6deg);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 120vmin;
+  height: 120vmin;
   border-radius: 50%;
   box-shadow:
     inset 0 0 50px #fff,
@@ -270,9 +273,9 @@ p { font-size: small; }
 
 @keyframes rotateglobe {
   0% {
-    background-position: 0 951px;
+    background-position: 0 center;
   }
   100% {
-    background-position: 6800px 600px;
+    background-position: -6800px center;
   }
 }
