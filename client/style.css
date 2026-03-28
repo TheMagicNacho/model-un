@@ -260,7 +260,7 @@ p { font-size: small; }
   background-repeat: repeat-x;
   background-size: var(--atlas-width) auto; /* Match atlas width so the loop distance aligns with the texture. */
   animation: rotateglobe 432s linear 0s infinite;
-  /* Keep the atlas upright (rotateZ removed after centering) and tilt slightly for depth (8deg X gives stronger shading when centered). */
+  /* Keep the atlas upright (rotateZ removed entirely) and tilt slightly for depth (8deg X gives stronger shading when centered). */
   transform: translate(-50%, -50%) rotateX(var(--globe-tilt-x)) rotateY(var(--globe-tilt-y));
   position: fixed;
   top: 50%;
