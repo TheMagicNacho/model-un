@@ -251,7 +251,7 @@ p { font-size: small; }
   background: radial-gradient(circle at center, rgba(148, 93, 255, 0.35) 0%, rgba(5, 15, 28, 0.6) 65%), url("img/atlas.png");
   background-blend-mode: screen;
   background-repeat: repeat-x;
-  background-size: 200% auto;
+  background-size: 200% auto; /* Upscale the texture to keep details soft while filling the glow. */
   animation: rotateglobe 432s linear 0s infinite;
   /* Keep the atlas upright (rotateZ removed to avoid upside-down rendering) while a slightly steeper 8deg X-tilt preserves depth when centered. */
   transform: translate(-50%, -50%) rotateX(8deg) rotateY(6deg);
@@ -278,7 +278,7 @@ p { font-size: small; }
     background-position: 0 center;
   }
   100% {
-    /* Traverse one full atlas width leftward (-7001px) to complete the spin loop. */
+    /* Traverse one full atlas width leftward (-7001px matches atlas.png width) to complete the spin loop. */
     background-position: -7001px center;
   }
 }
