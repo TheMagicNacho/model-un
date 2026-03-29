@@ -244,10 +244,11 @@ class Game {
         alert("Player name cannot be empty after removing illegal characters.");
         return;
       }
-      return;
+      local_state.name = trimmed;
+    } else {
+      local_state.name = raw_name;
     }
 
-    local_state.name = raw_name;
     const request = local_state;
     request.type = "ChangeName";
     ws.send(JSON.stringify(request));
