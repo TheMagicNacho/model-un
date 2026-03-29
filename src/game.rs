@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use log::{debug, info};
+use regex::Regex;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
@@ -53,9 +54,13 @@ impl Game {
     }
 
     fn find_illegal_character(input: &str) -> Option<char> {
-        input
-            .chars()
-            .find(|c| c.is_ascii_punctuation() || c.is_control())
+        lazy_static! {
+            static ref ILLEGAL_CHAR_REGEX: Regex = Regex::new(r"[<>|\p{P}\p{C}]").unwrap();
+        }
+
+        ILLEGAL_CHAR_REGEX
+            .find(input)
+            .and_then(|m| m.as_str().chars().next())
     }
 
     fn connection_for_player(room_state: &GameState, player_id: usize) -> String {
@@ -774,7 +779,6 @@ mod tests {
 
         let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
         assert_eq!(player.player_name, "Delegate Unknown");
-        assert!(state.players.iter().any(|p| p.player_id == 0));
         assert!(state.players.iter().all(|p| p.player_id != 1));
     }
 
