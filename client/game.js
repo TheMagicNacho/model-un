@@ -30,7 +30,6 @@ const VOTING_SEQUENCES = Object.freeze({
 
 // Only letters, numbers, and whitespace are allowed in player names.
 const ILLEGAL_NAME_CHARS = /[^\p{L}\p{N}\s]/u;
-const ILLEGAL_NAME_CHARS_GLOBAL = /[^\p{L}\p{N}\s]/gu;
 
 class Game {
   constructor() {
