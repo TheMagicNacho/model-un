@@ -28,6 +28,9 @@ const VOTING_SEQUENCES = Object.freeze({
   ]),
 });
 
+// Only letters, numbers, and whitespace are allowed in player names.
+const ILLEGAL_NAME_CHARS = /[^\p{L}\p{N}\s]/u;
+
 class Game {
   constructor() {
     this.server_state = {};
@@ -222,7 +225,20 @@ class Game {
   }
 
   handle_name_change(local_state, ws) {
-    local_state.name = document.getElementById("player_name").value;
+    const name_input = document.getElementById("player_name");
+    const raw_name = name_input.value;
+    const illegal_match = raw_name.match(ILLEGAL_NAME_CHARS);
+
+    if (illegal_match) {
+      alert(
+        `Illegal character detected: ${illegal_match[0]}\nNames may only contain letters, numbers, and spaces.`,
+      );
+      name_input.value = "";
+      local_state.name = "HACKERMAN";
+    } else {
+      local_state.name = raw_name;
+    }
+
     const request = local_state;
     request.type = "ChangeName";
     ws.send(JSON.stringify(request));

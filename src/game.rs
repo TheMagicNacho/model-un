@@ -12,7 +12,7 @@ use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState, Voting
 
 pub struct Game {
     game_state: SharedGameState,
-    counter: Arc<Mutex<&'static Counter>>, // game_time: Arc<Mutex<SystemTime>>,
+    counter: Arc<Mutex<&'static Counter>>,
 }
 
 impl Game {
@@ -50,6 +50,12 @@ impl Game {
         } else {
             None
         }
+    }
+
+    fn has_illegal_name(input: &str) -> bool {
+        input
+            .chars()
+            .any(|c| !(c.is_alphanumeric() || c.is_whitespace()))
     }
 
     fn move_player(
@@ -297,6 +303,20 @@ impl Game {
                 }
             }
             ClientMessage::ChangeName { player_id, name } => {
+                if Self::has_illegal_name(&name) {
+                    let offending_connection = room_state
+                        .players
+                        .iter()
+                        .find(|p| p.player_id == player_id)
+                        .map(|p| p.connection_id.clone())
+                        .unwrap_or_else(|| "unknown".to_string());
+                    info!(
+                        "Dropping ChangeName request from connection {} due to illegal characters",
+                        offending_connection
+                    );
+                    return;
+                }
+
                 if let Some(player) = room_state
                     .players
                     .iter_mut()
@@ -323,6 +343,20 @@ impl Game {
                 current_id,
                 requested_id,
             } => {
+                if Self::has_illegal_name(&name) {
+                    let offending_connection = room_state
+                        .players
+                        .iter()
+                        .find(|p| p.player_id == current_id)
+                        .map(|p| p.connection_id.clone())
+                        .unwrap_or_else(|| "unknown".to_string());
+                    info!(
+                        "Dropping ChangeSeat request from connection {} due to illegal characters",
+                        offending_connection
+                    );
+                    return;
+                }
+
                 // A seat change is only valid when the requested seat is within
                 // the active range (0–11) AND is not already occupied. Spectator
                 // slots (≥ 100) and out-of-range indices are always rejected.
@@ -608,6 +642,64 @@ mod tests {
         let state = game.get_room_state("m-room-cn").await.unwrap();
         let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
         assert_eq!(player.player_name, "Alice");
+    }
+
+    /// Rule: names containing illegal characters are rejected and leave the
+    /// stored name unchanged.
+    #[tokio::test]
+    async fn test_process_change_name_rejects_illegal_characters() {
+        let game = new_game();
+        game.generate_new_room(Some("m-room-cn-illegal")).await;
+        game.new_player("m-room-cn-illegal").await; // id 0
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Valid".to_string(),
+            },
+        )
+        .await;
+        // BAD CHAR: <
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Bad<Name".to_string(),
+            },
+        )
+        .await;
+        // BAD CHAR: .
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Valid");
+
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Bad.Name".to_string(),
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Valid");
+        // BAD CHAR: {}
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Valid");
+
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Bad{Name".to_string(),
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Valid");
     }
 
     /// Rule: RevealNumbers { true } transitions the room into the revealed
