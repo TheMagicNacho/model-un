@@ -52,6 +52,22 @@ impl Game {
         }
     }
 
+    fn find_illegal_character(input: &str) -> Option<char> {
+        input
+            .chars()
+            .find(|c| c.is_ascii_punctuation() || c.is_control())
+    }
+
+    fn connection_for_player(room_state: &GameState, player_id: usize) -> String {
+        room_state
+            .players
+            .iter()
+            .find(|p| p.player_id == player_id)
+            .map(|p| p.connection_id.clone())
+            .filter(|id| !id.is_empty())
+            .unwrap_or_else(|| "unknown".to_string())
+    }
+
     fn move_player(
         &self,
         old_id: usize,
@@ -297,6 +313,15 @@ impl Game {
                 }
             }
             ClientMessage::ChangeName { player_id, name } => {
+                if let Some(illegal) = Self::find_illegal_character(&name) {
+                    let offending_connection = Self::connection_for_player(room_state, player_id);
+                    info!(
+                        "Dropping ChangeName request from connection {} due to illegal character '{}'",
+                        offending_connection, illegal
+                    );
+                    return;
+                }
+
                 if let Some(player) = room_state
                     .players
                     .iter_mut()
@@ -323,6 +348,15 @@ impl Game {
                 current_id,
                 requested_id,
             } => {
+                if let Some(illegal) = Self::find_illegal_character(&name) {
+                    let offending_connection = Self::connection_for_player(room_state, current_id);
+                    info!(
+                        "Dropping ChangeSeat request from connection {} due to illegal character '{}'",
+                        offending_connection, illegal
+                    );
+                    return;
+                }
+
                 // A seat change is only valid when the requested seat is within
                 // the active range (0–11) AND is not already occupied. Spectator
                 // slots (≥ 100) and out-of-range indices are always rejected.
@@ -610,6 +644,26 @@ mod tests {
         assert_eq!(player.player_name, "Alice");
     }
 
+    /// Rule: names containing illegal characters are rejected and leave the
+    /// stored name unchanged.
+    #[tokio::test]
+    async fn test_process_change_name_rejects_illegal_characters() {
+        let game = new_game();
+        game.generate_new_room(Some("m-room-cn-illegal")).await;
+        game.new_player("m-room-cn-illegal").await; // id 0
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Bad<Name".to_string(),
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Delegate Unknown");
+    }
+
     /// Rule: RevealNumbers { true } transitions the room into the revealed
     /// state so that all clients can display vote values.
     #[tokio::test]
@@ -697,6 +751,32 @@ mod tests {
     }
 
     // ── Seat switching ───────────────────────────────────────────────────────
+
+    /// Rule: seat change requests with illegal characters in the provided name
+    /// are dropped without moving the player.
+    #[tokio::test]
+    async fn test_change_seat_rejects_illegal_name() {
+        let game = new_game();
+        game.generate_new_room(Some("s-room-illegal-seat")).await;
+        game.new_player("s-room-illegal-seat").await; // id 0
+
+        game.process_client_message(
+            "s-room-illegal-seat",
+            ClientMessage::ChangeSeat {
+                name: "Bad<Name".to_string(),
+                current_id: 0,
+                requested_id: 1,
+            },
+        )
+        .await;
+
+        let state = game.get_room_state("s-room-illegal-seat").await.unwrap();
+
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Delegate Unknown");
+        assert!(state.players.iter().any(|p| p.player_id == 0));
+        assert!(state.players.iter().all(|p| p.player_id != 1));
+    }
 
     /// Rule: a player may move to any vacant seat in the range 0–11.  Their
     /// name travels with them and the old seat becomes vacant.

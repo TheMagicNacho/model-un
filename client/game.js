@@ -28,6 +28,10 @@ const VOTING_SEQUENCES = Object.freeze({
   ]),
 });
 
+// Punctuation and control characters are prohibited in player names.
+const ILLEGAL_NAME_CHARS = /[\p{P}\p{C}]/u;
+const ILLEGAL_NAME_CHARS_GLOBAL = /[\p{P}\p{C}]/gu;
+
 class Game {
   constructor() {
     this.server_state = {};
@@ -222,7 +226,17 @@ class Game {
   }
 
   handle_name_change(local_state, ws) {
-    local_state.name = document.getElementById("player_name").value;
+    const name_input = document.getElementById("player_name");
+    const raw_name = name_input.value;
+    const illegal_match = raw_name.match(ILLEGAL_NAME_CHARS);
+
+    if (illegal_match) {
+      alert(`Illegal character detected: "${illegal_match[0]}"`);
+      name_input.value = raw_name.replace(ILLEGAL_NAME_CHARS_GLOBAL, "");
+      return;
+    }
+
+    local_state.name = raw_name;
     const request = local_state;
     request.type = "ChangeName";
     ws.send(JSON.stringify(request));
