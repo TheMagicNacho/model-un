@@ -55,7 +55,7 @@ impl Game {
 
     fn find_illegal_character(input: &str) -> Option<char> {
         lazy_static! {
-            static ref ILLEGAL_CHAR_REGEX: Regex = Regex::new(r"[<>|\p{P}\p{C}]").unwrap();
+            static ref ILLEGAL_CHAR_REGEX: Regex = Regex::new(r"[<>\p{P}\p{C}]").unwrap();
         }
 
         ILLEGAL_CHAR_REGEX
