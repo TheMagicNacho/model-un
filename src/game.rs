@@ -75,7 +75,10 @@ impl Game {
             state.players.remove(player_index);
             state.players.push(moved_player);
 
-            debug!("move_player - Old ID: {}, New ID: {} - finished", old_id, new_id);
+            debug!(
+                "move_player - Old ID: {}, New ID: {} - finished",
+                old_id, new_id
+            );
             true
         } else {
             false
@@ -330,13 +333,7 @@ impl Game {
                         .all(|p| p.player_id != requested_id);
 
                 if is_valid {
-                    if self.move_player(
-                        current_id,
-                        requested_id,
-                        room_state,
-                        Some(name),
-                        false,
-                    ) {
+                    if self.move_player(current_id, requested_id, room_state, Some(name), false) {
                         room_state.notify_change = NotifyChange {
                             current_id,
                             new_id: requested_id,
