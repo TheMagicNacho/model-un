@@ -152,8 +152,22 @@ impl GameWebSocket {
                                 }
                             }
                         },
-                        Err(_e) => {
-                            debug!("Broadcast channel receive error for room {}. Likely disconnected.", room);
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                            debug!(
+                                "Broadcast receiver for room {} lagged by {} messages; resyncing state.",
+                                room, skipped
+                            );
+                            if let Some(room_state) = game_state.get_room_state(&room).await {
+                                let serialized = serde_json::to_string(&ServerMessage::UpdateState(room_state))
+                                    .unwrap();
+                                if let Err(e) = ws_tx.send(Message::text(serialized)).await {
+                                    debug!("WebSocket send (state resync) error for room {}: {:?}", room, e);
+                                    break;
+                                }
+                            }
+                        },
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                            debug!("Broadcast channel closed for room {}.", room);
                             break;
                         }
                     }

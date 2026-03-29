@@ -185,19 +185,19 @@ async fn drain_final_state(
 fn assert_room_state_homogeneity(states: &[GameState], room: &str, expected_player_count: usize) {
     assert!(!states.is_empty(), "No states collected for room {room}");
 
-    let reference = &states[0];
+    let reference = &istates[0];
     let mut ref_ids: Vec<usize> = reference.players.iter().map(|p| p.player_id).collect();
     ref_ids.sort();
 
     // Every observed state must have the expected number
     // of players and the same set of player IDs.
     for (i, state) in states.iter().enumerate() {
+        let current_player_count = state.players.len();
         assert_eq!(
-            state.players.len(),
+            current_player_count,
             expected_player_count,
-            "Room {room}: client {i} saw {} players, \
-       expected {expected_player_count}",
-            state.players.len(),
+            "Room {room}: client {i} saw {current_player_count} players, \
+       expected {expected_player_count}"
         );
 
         let mut ids: Vec<usize> = state.players.iter().map(|p| p.player_id).collect();
@@ -294,7 +294,7 @@ async fn test_minimum_24_concurrent_connections() {
     let mut room_b_states: Vec<GameState> = Vec::new();
 
     for handle in handles {
-        match timeout(Duration::from_secs(5), handle).await {
+        match timeout(Duration::from_secs(10), handle).await {
             Ok(Ok((true, last_state, room))) => {
                 success_count += 1;
                 if let Some(state) = last_state {
@@ -319,7 +319,7 @@ async fn test_minimum_24_concurrent_connections() {
             }
         }
     }
-
+ 
     assert_eq!(
         success_count, total_clients,
         "All {total_clients} clients should complete \

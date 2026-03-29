@@ -42,7 +42,7 @@ impl Game {
             .iter()
             .filter(|p| p.player_id < Self::OVERFLOW_INDEX)
             .count();
-        if active_count <= Self::MAX_ROOM_SIZE {
+        if active_count < Self::MAX_ROOM_SIZE {
             players
                 .iter()
                 .find(|player| player.player_id >= Self::OVERFLOW_INDEX)
@@ -326,7 +326,7 @@ impl Game {
                 // A seat change is only valid when the requested seat is within
                 // the active range (0–11) AND is not already occupied. Spectator
                 // slots (≥ 100) and out-of-range indices are always rejected.
-                let is_valid = requested_id <= Self::MAX_ROOM_SIZE
+                let is_valid = requested_id < Self::MAX_ROOM_SIZE
                     && room_state
                         .players
                         .iter()
@@ -837,8 +837,6 @@ mod tests {
         game.generate_new_room(Some("s-room-preserve")).await;
         game.new_player("s-room-preserve").await; // id 0
         game.new_player("s-room-preserve").await; // id 1
-
-        // Name both players
         game.process_client_message(
             "s-room-preserve",
             ClientMessage::ChangeName {
