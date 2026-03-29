@@ -14,6 +14,8 @@ pub struct PlayerState {
     pub player_id: usize,
     pub player_name: String,
     pub value: Option<u8>,
+    #[serde(default, skip_serializing, skip_deserializing)]
+    pub connection_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
@@ -59,6 +61,11 @@ pub enum ClientMessage {
     },
     Pong {
         player_id: usize,
+    },
+    ChangeSeat {
+        name: String,
+        current_id: usize,
+        requested_id: usize,
     },
 }
 

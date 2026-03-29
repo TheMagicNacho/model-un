@@ -5,12 +5,13 @@ use futures::{FutureExt, SinkExt, StreamExt};
 use log::{debug, error};
 use tokio::sync::broadcast::Sender;
 use tokio::sync::mpsc;
+use uuid::Uuid;
 use warp::ws::{Message, WebSocket};
 use warp::{Rejection, Reply};
 
 use crate::connection_pool::ConnectionPool;
 use crate::game::Game;
-use crate::structs::{ClientMessage, ConnectionContext, RoomUpdate, ServerMessage};
+use crate::structs::{ClientMessage, ConnectionContext, NotifyChange, RoomUpdate, ServerMessage};
 
 pub struct GameWebSocket;
 
@@ -44,7 +45,10 @@ impl GameWebSocket {
 
         pool.add(room.clone(), sender.clone()).await;
 
-        let player_id = game_state.new_player(&room).await;
+        let connection_id = Uuid::new_v4().to_string();
+        let player_id = game_state
+            .new_player_with_connection(&room, connection_id.clone())
+            .await;
         debug!(
             "Room Player State: {:?}",
             game_state.get_room_state(&room).await.unwrap().players
@@ -54,8 +58,8 @@ impl GameWebSocket {
         let msg = serde_json::to_string(&ServerMessage::PlayerAssigned { player_id }).unwrap();
         let _ = ws_tx.send(Message::text(msg)).await;
 
-        // provide the client with the initial state
-        let room_state = (game_state.get_room_state(&room).await).unwrap_or_default();
+        let mut room_state = (game_state.get_room_state(&room).await).unwrap_or_default();
+        room_state.notify_change = NotifyChange::default();
         let msg = serde_json::to_string(&ServerMessage::UpdateState(room_state.clone())).unwrap();
         let _ = ws_tx.send(Message::text(msg)).await;
 
@@ -72,7 +76,7 @@ impl GameWebSocket {
             game_state,
             pool,
             sender,
-            player_id,
+            connection_id,
         )
         .await;
     }
@@ -83,9 +87,9 @@ impl GameWebSocket {
         game_state: &'static Game,
         pool: Arc<ConnectionPool>,
         sender: mpsc::Sender<Message>,
-        player_id: usize,
+        connection_id: String,
     ) {
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let mut interval = tokio::time::interval(Duration::from_secs(7));
 
         let tx = connection_context.tx;
         let mut rx = connection_context.rx;
@@ -115,12 +119,10 @@ impl GameWebSocket {
                         // Close the connections on any errors.
                         Some(Err(e)) => {
                             error!("WebSocket receive error for room {}: {:?}", room, e);
-                            game_state.remove_player(&room, player_id).await;
                             break;
                         },
                         None => {
                             debug!("WebSocket connection closed for room {}", room);
-                            game_state.remove_player(&room, player_id).await;
                             break;
                         }
                     }
@@ -132,6 +134,7 @@ impl GameWebSocket {
                     // TODO: Handle if a client goes stale and does not reply to a ping.
                     if let Err(e) = ws_tx.send(Message::text(ping_message)).await {
                         debug!("WebSocket send (ping) error for room {}: {:?}", room, e);
+                        game_state.remove_player_by_connection(&room, &connection_id).await;
                         break;
                     }
                 },
@@ -145,14 +148,26 @@ impl GameWebSocket {
                                 debug!("State Change for room {}: {:#?}", room, &serialized);
                                 if let Err(e) = ws_tx.send(Message::text(serialized)).await {
                                     debug!("WebSocket send (state update) error for room {}: {:?}", room, e);
-                                    game_state.remove_player(&room, player_id).await;
                                     break;
                                 }
                             }
                         },
-                        Err(_e) => {
-                            debug!("Broadcast channel receive error for room {}. Likely disconnected.", room);
-                            game_state.remove_player(&room, player_id).await;
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                            debug!(
+                                "Broadcast receiver for room {} lagged by {} messages; resyncing state.",
+                                room, skipped
+                            );
+                            if let Some(room_state) = game_state.get_room_state(&room).await {
+                                let serialized = serde_json::to_string(&ServerMessage::UpdateState(room_state))
+                                    .unwrap();
+                                if let Err(e) = ws_tx.send(Message::text(serialized)).await {
+                                    debug!("WebSocket send (state resync) error for room {}: {:?}", room, e);
+                                    break;
+                                }
+                            }
+                        },
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                            debug!("Broadcast channel closed for room {}.", room);
                             break;
                         }
                     }
@@ -160,8 +175,18 @@ impl GameWebSocket {
             }; // tokio::select!
         } // loop
         debug!("Connection driver finished for room: {}", room);
-
         pool.remove(&room, &sender).await;
-        game_state.remove_player(&room, player_id).await;
+        game_state
+            .remove_player_by_connection(&room, &connection_id)
+            .await;
+
+        // Broadcast updated state so remaining clients learn about the
+        // removal (and any spectator promotion that occurred).
+        if let Some(room_state) = game_state.get_room_state(&room).await {
+            let _ = tx.send(RoomUpdate {
+                room: room.to_string(),
+                state: room_state,
+            });
+        }
     }
 }

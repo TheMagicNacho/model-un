@@ -78,19 +78,21 @@ class Game {
       this.handle_reveal_button_click(this.local_state, ws);
     });
 
-    // Captain's hamburger menu: open popup
-    const captain_btn = document.getElementById("captain-menu-btn");
-    captain_btn.addEventListener("click", () => {
-      const popup = document.getElementById("sequence-popup");
-      popup.style.display = "flex";
-      // Highlight the currently active sequence
-      document.querySelectorAll(".sequence-option").forEach((btn) => {
-        btn.classList.toggle(
-          "active",
-          btn.dataset.sequence === (this.server_state.voting_sequence ?? "Fibonacci"),
-        );
-      });
-    });
+    // Add click handlers to all player card slots for seat switching.
+    // If the clicking player is the captain and clicks their own card, open the
+    // voting-sequence popup instead of attempting a seat switch.
+    for (let i = 0; i < this.max_table_size; i++) {
+      const player_card = document.getElementById(`player${i}id`);
+      if (player_card) {
+        player_card.addEventListener("click", () => {
+          if (i === this.local_state.player_id && this.is_captain()) {
+            this.open_sequence_popup();
+          } else {
+            this.handle_seat_change(i, ws);
+          }
+        });
+      }
+    }
 
     // Sequence option buttons: send ChangeSequence and close popup
     document.querySelectorAll(".sequence-option").forEach((btn) => {
@@ -110,6 +112,34 @@ class Game {
     document.getElementById("sequence-popup-close").addEventListener("click", () => {
       document.getElementById("sequence-popup").style.display = "none";
     });
+  }
+
+  open_sequence_popup() {
+    const popup = document.getElementById("sequence-popup");
+    popup.style.display = "flex";
+    // Highlight the currently active sequence
+    document.querySelectorAll(".sequence-option").forEach((btn) => {
+      btn.classList.toggle(
+        "active",
+        btn.dataset.sequence === (this.server_state.voting_sequence ?? "Fibonacci"),
+      );
+    });
+  }
+
+  handle_seat_change(new_seat, ws) {
+    // Only switch if clicking a different, vacant seat
+    if (this.local_state.player_id === new_seat) return;
+    const is_vacant = !this.server_state.players?.some((p) => p.player_id === new_seat);
+    if (is_vacant) {
+      ws.send(
+        JSON.stringify({
+          type: "ChangeSeat",
+          name: this.local_state.name,
+          current_id: this.local_state.player_id,
+          requested_id: new_seat,
+        }),
+      );
+    }
   }
 
   is_captain() {
@@ -244,20 +274,22 @@ class Game {
     });
   }
 
+  get_captain_id() {
+    if (!this.server_state.players || this.server_state.players.length === 0) return null;
+    const active = this.server_state.players.filter((p) => p.player_id < this.overflow_index);
+    if (active.length === 0) return null;
+    return Math.min(...active.map((p) => p.player_id));
+  }
+
   update_dom_from_server_state() {
     const current_size = this.server_state.players.length;
+    const captain_id = this.get_captain_id();
 
     // Update vote options if the sequence changed
     const server_sequence = this.server_state.voting_sequence;
     if (server_sequence !== this.local_state.current_sequence) {
       this.local_state.current_sequence = server_sequence;
       this.update_vote_options(server_sequence);
-    }
-
-    // Show the hamburger menu only to the captain
-    const captain_btn = document.getElementById("captain-menu-btn");
-    if (captain_btn) {
-      captain_btn.style.display = this.is_captain() ? "block" : "none";
     }
 
     const tableArea = document.getElementsByClassName("table-area")[0];
@@ -291,6 +323,8 @@ class Game {
         // Reset state for all cards first
         player_card_element.classList.remove("player-ready");
         player_card_element.classList.add("player-vacant");
+        player_card_element.classList.remove("player-captain");
+        player_card_element.classList.remove("player-captain-self");
 
         // Find if there's a player for this position
         const player = this.server_state.players.find((p) => p.player_id === i);
@@ -300,6 +334,15 @@ class Game {
           player_card_element.classList.remove("player-vacant");
           if (player.value > 0) {
             player_card_element.classList.add("player-ready");
+          }
+          if (player.player_id === captain_id) {
+            player_card_element.classList.add("player-captain");
+            // player-captain-self marks the local player's card when they are
+            // captain — the CSS uses it to show cursor:pointer and a grow effect
+            // on crown hover, and the click handler uses it to open the popup.
+            if (player.player_id === this.local_state.player_id) {
+              player_card_element.classList.add("player-captain-self");
+            }
           }
 
           if (player_name_element) {
@@ -366,40 +409,41 @@ class Game {
           }
         }
       }
-      const control_area = document.getElementById("polymorphic-hud");
-      const value_input = document.getElementById("player_value");
-      const reveal_button = document.getElementById("reveal-button");
-      const value_label = document.querySelector('label[for="player_value"]');
+    }
 
-      if (this.local_state.player_id > this.overflow_index) {
-        // Spectator Mode
+    const control_area = document.getElementById("polymorphic-hud");
+    const value_input = document.getElementById("player_value");
+    const reveal_button = document.getElementById("reveal-button");
+    const value_label = document.querySelector('label[for="player_value"]');
 
-        if (control_area) {
-          if (value_input) value_input.style.visibility = "hidden";
-          if (reveal_button) reveal_button.style.visibility = "hidden";
-          if (value_label) value_label.style.visibility = "hidden";
+    if (this.local_state.player_id >= this.overflow_index) {
+      // Spectator Mode
 
-          // Create and insert the Spectator Mode message
-          if (!document.getElementById("spectator-message")) {
-            const spectator_message = document.createElement("div");
-            spectator_message.innerHTML =
-              "" +
-              "<h2>Spectator Mode</h2>" +
-              "<p>All the delegate seats are taken.</p>" +
-              "<p>When a current delegate leaves, you will automatically take their seat. In the mean time, feel free to enter your name!</p>";
+      if (control_area) {
+        if (value_input) value_input.style.visibility = "hidden";
+        if (reveal_button) reveal_button.style.visibility = "hidden";
+        if (value_label) value_label.style.visibility = "hidden";
 
-            spectator_message.id = "spectator-message"; // Give it an ID if you need to manipulate it later.
-            control_area.appendChild(spectator_message);
-          }
+        // Create and insert the Spectator Mode message
+        if (!document.getElementById("spectator-message")) {
+          const spectator_message = document.createElement("div");
+          spectator_message.innerHTML =
+            "" +
+            "<h2>Spectator Mode</h2>" +
+            "<p>All the delegate seats are taken.</p>" +
+            "<p>When a current delegate leaves, you will automatically take their seat. In the mean time, feel free to enter your name!</p>";
+
+          spectator_message.id = "spectator-message"; // Give it an ID if you need to manipulate it later.
+          control_area.appendChild(spectator_message);
         }
-      } else {
-        if (value_input) value_input.style.visibility = "visible";
-        if (reveal_button) reveal_button.style.visibility = "visible";
-        if (value_label) value_label.style.visibility = "visible";
+      }
+    } else {
+      if (value_input) value_input.style.visibility = "visible";
+      if (reveal_button) reveal_button.style.visibility = "visible";
+      if (value_label) value_label.style.visibility = "visible";
 
-        if (document.getElementById("spectator-message")) {
-          document.getElementById("spectator-message").remove();
-        }
+      if (document.getElementById("spectator-message")) {
+        document.getElementById("spectator-message").remove();
       }
     }
   }
