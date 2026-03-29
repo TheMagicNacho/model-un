@@ -236,7 +236,13 @@ class Game {
       alert(
         `Illegal character detected: "${illegal_match[0]}". Names cannot contain punctuation, control characters, or angle brackets.`,
       );
-      name_input.value = raw_name.replace(ILLEGAL_NAME_CHARS_GLOBAL, "");
+      const cleaned = raw_name.replace(ILLEGAL_NAME_CHARS_GLOBAL, "");
+      if (!cleaned.trim()) {
+        alert("Player name cannot be empty after removing illegal characters.");
+        name_input.value = "";
+        return;
+      }
+      name_input.value = cleaned;
       return;
     }
 

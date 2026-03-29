@@ -56,7 +56,8 @@ impl Game {
     fn find_illegal_character(input: &str) -> Option<char> {
         lazy_static! {
             // Keep this pattern in sync with the client-side validation in client/game.js.
-            // It rejects punctuation (\p{P}), control characters (\p{C}), and angle brackets.
+            // It rejects punctuation (\p{P}), control characters (\p{C}), and explicitly
+            // forbids angle brackets often used in HTML/script injection.
             static ref ILLEGAL_CHAR_REGEX: Regex = Regex::new(r"[<>\p{P}\p{C}]").unwrap();
         }
 
