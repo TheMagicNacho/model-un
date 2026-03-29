@@ -55,6 +55,8 @@ impl Game {
 
     fn find_illegal_character(input: &str) -> Option<char> {
         lazy_static! {
+            // Keep this pattern in sync with the client-side validation in client/game.js.
+            // It rejects punctuation (\p{P}), control characters (\p{C}), and angle brackets.
             static ref ILLEGAL_CHAR_REGEX: Regex = Regex::new(r"[<>\p{P}\p{C}]").unwrap();
         }
 
@@ -660,13 +662,21 @@ mod tests {
             "m-room-cn-illegal",
             ClientMessage::ChangeName {
                 player_id: 0,
+                name: "Valid".to_string(),
+            },
+        )
+        .await;
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
                 name: "Bad<Name".to_string(),
             },
         )
         .await;
         let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
         let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
-        assert_eq!(player.player_name, "Delegate Unknown");
+        assert_eq!(player.player_name, "Valid");
     }
 
     /// Rule: RevealNumbers { true } transitions the room into the revealed

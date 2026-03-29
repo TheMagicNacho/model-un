@@ -231,7 +231,9 @@ class Game {
     const illegal_match = raw_name.match(ILLEGAL_NAME_CHARS);
 
     if (illegal_match) {
-      alert(`Illegal character detected: "${illegal_match[0]}"`);
+      alert(
+        `Illegal character detected: "${illegal_match[0]}". Names cannot contain punctuation, control characters, or angle brackets.`,
+      );
       name_input.value = raw_name.replace(ILLEGAL_NAME_CHARS_GLOBAL, "");
       return;
     }
