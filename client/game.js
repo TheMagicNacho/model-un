@@ -29,8 +29,9 @@ const VOTING_SEQUENCES = Object.freeze({
 });
 
 // Punctuation, control characters, and angle brackets are prohibited in player names.
-const ILLEGAL_NAME_CHARS = /[<>\p{P}\p{C}]/u;
-const ILLEGAL_NAME_CHARS_GLOBAL = /[<>\p{P}\p{C}]/gu;
+const ILLEGAL_NAME_PATTERN = "[<>\\p{P}\\p{C}]";
+const ILLEGAL_NAME_CHARS = new RegExp(ILLEGAL_NAME_PATTERN, "u");
+const ILLEGAL_NAME_CHARS_GLOBAL = new RegExp(ILLEGAL_NAME_PATTERN, "gu");
 
 class Game {
   constructor() {

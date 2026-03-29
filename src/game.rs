@@ -65,7 +65,7 @@ impl Game {
             .and_then(|m| m.as_str().chars().next())
     }
 
-    fn connection_for_player(room_state: &GameState, player_id: usize) -> String {
+    fn connection_id_for_player(room_state: &GameState, player_id: usize) -> String {
         room_state
             .players
             .iter()
@@ -321,7 +321,8 @@ impl Game {
             }
             ClientMessage::ChangeName { player_id, name } => {
                 if let Some(illegal) = Self::find_illegal_character(&name) {
-                    let offending_connection = Self::connection_for_player(room_state, player_id);
+                    let offending_connection =
+                        Self::connection_id_for_player(room_state, player_id);
                     info!(
                         "Dropping ChangeName request from connection {} due to illegal character '{}'",
                         offending_connection, illegal
@@ -356,7 +357,8 @@ impl Game {
                 requested_id,
             } => {
                 if let Some(illegal) = Self::find_illegal_character(&name) {
-                    let offending_connection = Self::connection_for_player(room_state, current_id);
+                    let offending_connection =
+                        Self::connection_id_for_player(room_state, current_id);
                     info!(
                         "Dropping ChangeSeat request from connection {} due to illegal character '{}'",
                         offending_connection, illegal
