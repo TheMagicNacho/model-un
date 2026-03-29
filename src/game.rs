@@ -2,8 +2,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use lazy_static::lazy_static;
-use log::{debug, error, info};
+use log::{debug, info};
 use tokio::sync::{Mutex, RwLock};
+use uuid::Uuid;
 
 use crate::SharedGameState;
 use crate::counter::Counter;
@@ -26,6 +27,9 @@ impl Game {
         }
     }
 
+    const MAX_ROOM_SIZE: usize = 12;
+    const OVERFLOW_INDEX: usize = 100;
+
     pub fn instance() -> &'static Game {
         lazy_static! {
             static ref GAME: Game = Game::new();
@@ -34,14 +38,47 @@ impl Game {
     }
 
     fn find_player_in_waiting(&self, players: &[PlayerState]) -> Option<usize> {
-        let active_count = players.iter().filter(|p| p.player_id < 100).count();
-        if active_count < 12 {
+        let active_count = players
+            .iter()
+            .filter(|p| p.player_id < Self::OVERFLOW_INDEX)
+            .count();
+        if active_count <= Self::MAX_ROOM_SIZE {
             players
                 .iter()
-                .find(|player| player.player_id >= 100)
+                .find(|player| player.player_id >= Self::OVERFLOW_INDEX)
                 .map(|player| player.player_id)
         } else {
             None
+        }
+    }
+
+    fn move_player(
+        &self,
+        old_id: usize,
+        new_id: usize,
+        state: &mut GameState,
+        player_name: Option<String>,
+        reset_value: bool,
+    ) -> bool {
+        if let Some(player_index) = state.players.iter().position(|p| p.player_id == old_id) {
+            let mut moved_player = state.players[player_index].clone();
+            moved_player.player_id = new_id;
+
+            if let Some(player_name) = player_name {
+                moved_player.player_name = player_name;
+            }
+
+            if reset_value {
+                moved_player.value = None;
+            }
+
+            state.players.remove(player_index);
+            state.players.push(moved_player);
+
+            debug!("move_player - Old ID: {}, New ID: {} - finished", old_id, new_id);
+            true
+        } else {
+            false
         }
     }
 
@@ -69,20 +106,19 @@ impl Game {
             let vacant_id = player_id;
             match player_in_waiting {
                 Some(old_id) => {
-                    self.promote_player(old_id, vacant_id, room_state);
+                    if self.move_player(old_id, vacant_id, room_state, None, true) {
+                        room_state.notify_change = NotifyChange {
+                            current_id: old_id,
+                            new_id: player_id,
+                        };
 
-                    room_state.notify_change = NotifyChange {
-                        current_id: old_id,
-                        new_id: player_id,
-                    };
-
-                    debug!("Player {} promoted to position {}", old_id, player_id);
+                        debug!("Player {} promoted to position {}", old_id, player_id);
+                    } else {
+                        room_state.notify_change = NotifyChange::default();
+                    }
                 }
                 None => {
-                    room_state.notify_change = NotifyChange {
-                        current_id: 0,
-                        new_id: 0,
-                    };
+                    room_state.notify_change = NotifyChange::default();
                 }
             }
         }
@@ -93,24 +129,28 @@ impl Game {
         );
     }
 
-    fn promote_player(&self, old_id: usize, new_id: usize, state: &mut GameState) {
-        if let Some(player_index) = state.players.iter().position(|p| p.player_id == old_id) {
-            let cloned_player = state.players[player_index].clone();
+    /// Remove a player from a room by immutable connection ID.
+    ///
+    /// This decouples socket lifetime from mutable seat/player IDs.
+    pub async fn remove_player_by_connection(&self, room: &str, connection_id: &str) {
+        let player_id = {
+            let state = self.game_state.read().await;
+            state.get(room).and_then(|room_state| {
+                room_state
+                    .players
+                    .iter()
+                    .find(|p| p.connection_id == connection_id)
+                    .map(|p| p.player_id)
+            })
+        };
 
-            let promoted_player = PlayerState {
-                player_id: new_id,
-                player_name: cloned_player.player_name,
-                value: None,
-            };
-
-            state.players.remove(player_index);
-            state.players.push(promoted_player);
+        match player_id {
+            Some(player_id) => self.remove_player(room, player_id).await,
+            None => debug!(
+                "remove_player_by_connection - no player found in room {} for connection {}",
+                room, connection_id
+            ),
         }
-
-        debug!(
-            "promote_player - Old ID: {}, New ID: {} - finished",
-            old_id, new_id
-        );
     }
 
     pub async fn generate_new_room(&self, room: Option<&str>) -> String {
@@ -161,68 +201,56 @@ impl Game {
         room_name
     }
 
-    async fn update_room_state(&self, room: String, state: GameState) -> Option<GameState> {
-        debug!("update_room_state - Room: {} - finished", room);
-        self.game_state.write().await.insert(room.clone(), state)
-    }
-
     pub async fn get_room_state(&self, room: &str) -> Option<GameState> {
         debug!("get_room_state - Room: {}", room);
 
         self.game_state.read().await.get(room).cloned()
     }
 
-    async fn calculate_player_id(&self, room: &str) -> usize {
-        debug!("calculate_player_id - Room: {}", room);
-        let max_room_size = 12;
-        let overflow_index = 100;
+    pub async fn new_player_with_connection(&self, room: &str, connection_id: String) -> usize {
+        debug!("new_player - Room: {}", room);
 
-        let player_id = match self.get_room_state(room).await {
-            Some(state) => {
-                if state.players.len() >= max_room_size {
-                    overflow_index + state.players.len()
-                } else {
-                    // Find the lowest unused player ID
-                    (0..state.players.len())
-                        .find(|&i| state.players.iter().all(|p| p.player_id != i))
-                        .unwrap_or(state.players.len())
-                }
-            }
-            None => {
-                // if we had to generate a new room, then we know that the new player id
-                // will be 0
-                self.generate_new_room(Some(room)).await;
-                return 0;
-            }
+        let mut state = self.game_state.write().await;
+
+        // Create room if it does not exist yet.
+        if !state.contains_key(room) {
+            state.insert(
+                room.to_string(),
+                GameState {
+                    players: Vec::new(),
+                    all_revealed: false,
+                    notify_change: NotifyChange::default(),
+                    voting_sequence: VotingSequence::default(),
+                },
+            );
+        }
+
+        let room_state = state.get_mut(room).unwrap();
+
+        let active_player_count = room_state
+            .players
+            .iter()
+            .filter(|p| p.player_id < Self::OVERFLOW_INDEX)
+            .count();
+
+        let player_id = if active_player_count >= Self::MAX_ROOM_SIZE {
+            // Spectator: find the lowest available ID >= OVERFLOW_INDEX.
+            (Self::OVERFLOW_INDEX..)
+                .find(|&id| room_state.players.iter().all(|p| p.player_id != id))
+                .unwrap()
+        } else {
+            // Find the lowest unused active seat ID.
+            (0..Self::MAX_ROOM_SIZE)
+                .find(|&i| room_state.players.iter().all(|p| p.player_id != i))
+                .unwrap_or(Self::MAX_ROOM_SIZE)
         };
 
-        debug!(
-            "calculate_player_id - Room: {} - Player ID: {} - finished",
-            room, player_id
-        );
-        player_id
-    }
-
-    pub async fn new_player(&self, room: &str) -> usize {
-        debug!("new_player - Room: {}", room);
-        let player_id = self.calculate_player_id(room).await;
-
-        match self.get_room_state(room).await {
-            Some(mut room_state) => {
-                room_state.players.push(PlayerState {
-                    player_id,
-                    player_name: "Delegate Unknown".to_string(),
-                    value: None,
-                });
-                match self.update_room_state(room.to_string(), room_state).await {
-                    None => error!("Could not update room state."),
-                    Some(room_state) => debug!("State updated: {:?}", room_state),
-                }
-            }
-            None => {
-                error!("Room state not found in new_player for room: {}", room);
-            }
-        }
+        room_state.players.push(PlayerState {
+            player_id,
+            player_name: "Delegate Unknown".to_string(),
+            value: None,
+            connection_id,
+        });
 
         info!("Player {} joined the room.", player_id);
         debug!(
@@ -230,6 +258,11 @@ impl Game {
             room, player_id
         );
         player_id
+    }
+
+    pub async fn new_player(&self, room: &str) -> usize {
+        self.new_player_with_connection(room, Uuid::new_v4().to_string())
+            .await
     }
 
     /// Process a message received from a client and update the room state.
@@ -288,38 +321,33 @@ impl Game {
                 requested_id,
             } => {
                 // A seat change is only valid when the requested seat is within
-                // the active range (0–11) AND is not already occupied.  Spectator
+                // the active range (0–11) AND is not already occupied. Spectator
                 // slots (≥ 100) and out-of-range indices are always rejected.
-                let max_room_size = 12;
-                let is_valid = requested_id < max_room_size
+                let is_valid = requested_id <= Self::MAX_ROOM_SIZE
                     && room_state
                         .players
                         .iter()
                         .all(|p| p.player_id != requested_id);
 
                 if is_valid {
-                    // The existing PlayerState is mutated in-place: its player_id
-                    // is updated to the requested seat and the name from the
-                    // message is applied so it follows the player across seats.
-                    // The old seat simply ceases to exist — no separate cleanup
-                    // step is needed because the player object is identified by
-                    // its player_id field, not by position in the Vec.
-                    if let Some(player) = room_state
-                        .players
-                        .iter_mut()
-                        .find(|p| p.player_id == current_id)
-                    {
-                        player.player_id = requested_id;
-                        player.player_name = name;
-                    }
-                    room_state.notify_change = NotifyChange {
+                    if self.move_player(
                         current_id,
-                        new_id: requested_id,
-                    };
-                    debug!(
-                        "Player {} moved to seat {} in room {}",
-                        current_id, requested_id, room
-                    );
+                        requested_id,
+                        room_state,
+                        Some(name),
+                        false,
+                    ) {
+                        room_state.notify_change = NotifyChange {
+                            current_id,
+                            new_id: requested_id,
+                        };
+                        debug!(
+                            "Player {} moved to seat {} in room {}",
+                            current_id, requested_id, room
+                        );
+                    } else {
+                        room_state.notify_change = NotifyChange::default();
+                    }
                 } else {
                     room_state.notify_change = NotifyChange::default();
                 }
@@ -340,24 +368,6 @@ impl Game {
                 }
             }
         }
-    }
-
-    /// Returns the player's current seat ID after a potential seat change.
-    ///
-    /// After calling `process_client_message`, the caller can pass the
-    /// player's locally tracked ID here.  If `notify_change` records that this
-    /// exact player moved (i.e. `current_id` matches and `new_id` differs),
-    /// the updated seat ID is returned.  Otherwise the original ID is returned
-    /// unchanged.  This keeps all game-state comparisons inside the game module
-    /// so that `interface.rs` only handles socket I/O.
-    pub async fn resolve_player_id(&self, room: &str, current_id: usize) -> usize {
-        if let Some(state) = self.game_state.read().await.get(room) {
-            let nc = &state.notify_change;
-            if nc.current_id == current_id && nc.new_id != current_id {
-                return nc.new_id;
-            }
-        }
-        current_id
     }
 }
 
@@ -509,6 +519,41 @@ mod tests {
         // notify_change records the promotion
         assert_eq!(state.notify_change.current_id, spectator_id);
         assert_eq!(state.notify_change.new_id, 0);
+    }
+
+    /// Rule: after a spectator is promoted into an active seat, the next joiner
+    /// must stay in spectator mode with a fresh overflow ID instead of reusing
+    /// the promoted spectator's old overflow ID.
+    #[tokio::test]
+    async fn test_new_spectator_gets_fresh_id_after_promotion() {
+        let game = new_game();
+        game.generate_new_room(Some("r-room-fresh-spectator")).await;
+        for _ in 0..12 {
+            game.new_player("r-room-fresh-spectator").await;
+        }
+
+        let first_spectator_id = game.new_player("r-room-fresh-spectator").await;
+        assert!(
+            first_spectator_id >= Game::OVERFLOW_INDEX,
+            "13th player must be a spectator"
+        );
+
+        // Remove player 0; first spectator is promoted into seat 0.
+        game.remove_player("r-room-fresh-spectator", 0).await;
+
+        // The promoted spectator's old overflow ID is now free, so the next
+        // spectator reuses it (lowest available ID >= OVERFLOW_INDEX).
+        let next_join_id = game.new_player("r-room-fresh-spectator").await;
+        assert!(
+            next_join_id >= Game::OVERFLOW_INDEX,
+            "new player should be a spectator"
+        );
+
+        let state = game.get_room_state("r-room-fresh-spectator").await.unwrap();
+        // Promoted player occupies seat 0.
+        assert!(state.players.iter().any(|p| p.player_id == 0));
+        // New spectator exists.
+        assert!(state.players.iter().any(|p| p.player_id == next_join_id));
     }
 
     /// Rule: when the room is not full and has no spectators, removing a player

@@ -416,7 +416,7 @@ class Game {
     const reveal_button = document.getElementById("reveal-button");
     const value_label = document.querySelector('label[for="player_value"]');
 
-    if (this.local_state.player_id > this.overflow_index) {
+    if (this.local_state.player_id >= this.overflow_index) {
       // Spectator Mode
 
       if (control_area) {

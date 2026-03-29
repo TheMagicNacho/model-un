@@ -14,6 +14,8 @@ pub struct PlayerState {
     pub player_id: usize,
     pub player_name: String,
     pub value: Option<u8>,
+    #[serde(default, skip_serializing, skip_deserializing)]
+    pub connection_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
