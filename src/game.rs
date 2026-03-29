@@ -659,11 +659,41 @@ mod tests {
             },
         )
         .await;
+        // BAD CHAR: <
         game.process_client_message(
             "m-room-cn-illegal",
             ClientMessage::ChangeName {
                 player_id: 0,
                 name: "Bad<Name".to_string(),
+            },
+        )
+        .await;
+        // BAD CHAR: .
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Valid");
+
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Bad.Name".to_string(),
+            },
+        )
+        .await;
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Valid");
+        // BAD CHAR: {}
+        let state = game.get_room_state("m-room-cn-illegal").await.unwrap();
+        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_name, "Valid");
+
+        game.process_client_message(
+            "m-room-cn-illegal",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Bad{Name".to_string(),
             },
         )
         .await;
