@@ -239,12 +239,11 @@ class Game {
       );
       const cleaned = raw_name.replace(ILLEGAL_NAME_CHARS_GLOBAL, "");
       const trimmed = cleaned.trim();
+      name_input.value = trimmed;
       if (!trimmed) {
         alert("Player name cannot be empty after removing illegal characters.");
-        name_input.value = trimmed;
         return;
       }
-      name_input.value = trimmed;
       return;
     }
 
