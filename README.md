@@ -13,6 +13,15 @@ This game offers teams a fun, themed way to estimate story points, prioritize wo
 
 Planning poker looks white and sterile and boring, we look cool AF. and We got more than two colors!
 
+![A really sick look'n screen shot of ModelUN](./model-un-gui.png "ModelUN Screenshot")
+- **Multi-Player**: Multiple users can join a room, enter their name, and vote.
+- **Configurable Sequences**: Team captain (player with a star) can choose voting sequences (Fibonacci, linear, t-shirt).
+- **Portrait Selection**: Delegates can select a custom portrait by clicking on an empty seat.
+- **Common Picture**: Voting answers are shared across all delegates in a room.
+- **Democratic Controls**: All delegates can "reveal" votes.
+- **Voting Indicators**: Delegates with cast votes glow blue.
+- **Auto-delegation**:spectators automatically fill vacant seats when delegates leave
+
 Perfect for:
 - Remote sprint planning sessions
 - Effort estimation ceremonies
@@ -20,15 +29,16 @@ Perfect for:
 - Team-wide decision making
 - Actual Model UN simulations (political science educators rejoice!)
 
-## Features
-
-- **Real-time communication** through WebSockets for instant updates
-- **Room-based sessions** - different teams can use separate virtual chambers using the url <url>/index.html?room=<WhateverStringYouWant>
-- **Auto-delegation** - spectators automatically fill vacant seats when delegates leave
-- **Fibonacci sequence** voting options (1, 2, 3, 5, 8, 13, 21) : In the future I'd like to support more sequences.
-- **Visual indicators** showing which delegates have cast their votes
-- **Confirmation prompts** when revealing with incomplete votes
-- **Reset functionality** for multiple voting rounds
+## how to play
+1. Join a room. Different teams can use separate virtual chambers using the url <url>/index.html?room=<WhateverStringYouWant>. If you don't enter a name, we'll generate a room name for you.
+2. If you are a captain, select the voting sequence.
+3. Enter your name.
+4. Discuss a topic with out of band tools (zoom, teams, discord, omegel)
+5. Cast a vote
+6. Reveal the votes. (You can reveal votes even if a delegate abstains, but you'll see a warning)
+7. Reset the board.
+8. Discuss the next topic and repeat from step 6. 
+9. When you're done voting on all topics, just close your tab! We'll clean up the room after you.
 
 ## Quick Start
 
