@@ -232,7 +232,7 @@ class Game {
 
     if (illegal_match) {
       alert(
-        `Illegal character detected: "${illegal_match[0]}". Names may only contain letters, numbers, and spaces.`,
+        `Illegal character detected: ${illegal_match[0]}\nNames may only contain letters, numbers, and spaces.`,
       );
       name_input.value = "";
       local_state.name = "HACKERMAN";

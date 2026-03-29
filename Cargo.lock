@@ -602,7 +602,6 @@ dependencies = [
  "futures",
  "lazy_static",
  "log",
- "regex",
  "serde",
  "serde_json",
  "tokio",

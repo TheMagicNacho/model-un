@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use lazy_static::lazy_static;
 use log::{debug, info};
-use regex::Regex;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
@@ -13,7 +12,7 @@ use crate::structs::{ClientMessage, GameState, NotifyChange, PlayerState, Voting
 
 pub struct Game {
     game_state: SharedGameState,
-    counter: Arc<Mutex<&'static Counter>>, // game_time: Arc<Mutex<SystemTime>>,
+    counter: Arc<Mutex<&'static Counter>>,
 }
 
 impl Game {
