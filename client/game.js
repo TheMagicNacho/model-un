@@ -241,6 +241,8 @@ class Game {
       const trimmed = cleaned.trim();
       if (!trimmed) {
         alert("Player name cannot be empty after removing illegal characters.");
+        name_input.value = trimmed;
+        return;
       }
       name_input.value = trimmed;
       return;

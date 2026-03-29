@@ -57,8 +57,8 @@ impl Game {
         lazy_static! {
             // Keep this pattern in sync with the client-side validation in client/game.js.
             // It rejects punctuation (\p{P}), control characters (\p{C}), and explicitly
-            // forbids angle brackets (< and > are category Sm, not matched by \p{P}) to
-            // block HTML/script injection.
+            // forbids angle brackets (< and > are Unicode math symbols, category Sm, so they
+            // are not matched by \p{P}) to block HTML/script injection.
             static ref ILLEGAL_CHAR_REGEX: Regex =
                 Regex::new(r"(?:[<>]|[\p{P}\p{C}])").unwrap();
         }
