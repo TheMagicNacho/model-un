@@ -194,8 +194,7 @@ fn assert_room_state_homogeneity(states: &[GameState], room: &str, expected_play
     for (i, state) in states.iter().enumerate() {
         let current_player_count = state.players.len();
         assert_eq!(
-            current_player_count,
-            expected_player_count,
+            current_player_count, expected_player_count,
             "Room {room}: client {i} saw {current_player_count} players, \
        expected {expected_player_count}"
         );
@@ -329,7 +328,7 @@ async fn test_minimum_24_concurrent_connections() {
             }
         }
     }
- 
+
     assert_eq!(
         success_count, total_clients,
         "All {total_clients} clients should complete \
