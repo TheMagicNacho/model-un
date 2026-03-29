@@ -29,6 +29,7 @@ const VOTING_SEQUENCES = Object.freeze({
 });
 
 // Punctuation, control characters, and angle brackets are prohibited in player names.
+// Keep this pattern in sync with the server validation in src/game.rs.
 const ILLEGAL_NAME_PATTERN = "[<>\\p{P}\\p{C}]";
 const ILLEGAL_NAME_CHARS = new RegExp(ILLEGAL_NAME_PATTERN, "u");
 const ILLEGAL_NAME_CHARS_GLOBAL = new RegExp(ILLEGAL_NAME_PATTERN, "gu");

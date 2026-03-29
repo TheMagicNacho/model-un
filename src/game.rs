@@ -790,6 +790,7 @@ mod tests {
         let state = game.get_room_state("s-room-illegal-seat").await.unwrap();
 
         let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
+        assert_eq!(player.player_id, 0);
         assert_eq!(player.player_name, "Delegate Unknown");
         assert!(state.players.iter().all(|p| p.player_id != 1));
     }
