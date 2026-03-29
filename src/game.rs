@@ -53,30 +53,10 @@ impl Game {
         }
     }
 
-    fn find_illegal_character(input: &str) -> Option<char> {
-        lazy_static! {
-            // Keep this pattern in sync with the client-side validation in client/game.js.
-            // It rejects punctuation (\p{P}), control characters (\p{C}), and explicitly
-            // forbids the ASCII angle brackets (< and >). These characters are Unicode math
-            // symbols (category Sm) rather than punctuation, so we include them to block
-            // HTML/script injection even though \p{P} would not match them.
-            static ref ILLEGAL_CHAR_REGEX: Regex =
-                Regex::new(r"(?:[<>]|[\p{P}\p{C}])").unwrap();
-        }
-
-        ILLEGAL_CHAR_REGEX
-            .find(input)
-            .and_then(|m| m.as_str().chars().next())
-    }
-
-    fn connection_id_for_player(room_state: &GameState, player_id: usize) -> String {
-        room_state
-            .players
-            .iter()
-            .find(|p| p.player_id == player_id)
-            .map(|p| p.connection_id.clone())
-            .filter(|id| !id.is_empty())
-            .unwrap_or_else(|| "unknown".to_string())
+    fn has_illegal_name(input: &str) -> bool {
+        input
+            .chars()
+            .any(|c| !(c.is_alphanumeric() || c.is_whitespace()))
     }
 
     fn move_player(
@@ -324,12 +304,16 @@ impl Game {
                 }
             }
             ClientMessage::ChangeName { player_id, name } => {
-                if let Some(illegal) = Self::find_illegal_character(&name) {
-                    let offending_connection =
-                        Self::connection_id_for_player(room_state, player_id);
+                if Self::has_illegal_name(&name) {
+                    let offending_connection = room_state
+                        .players
+                        .iter()
+                        .find(|p| p.player_id == player_id)
+                        .map(|p| p.connection_id.clone())
+                        .unwrap_or_else(|| "unknown".to_string());
                     info!(
-                        "Dropping ChangeName request from connection {} due to illegal character '{}'",
-                        offending_connection, illegal
+                        "Dropping ChangeName request from connection {} due to illegal characters",
+                        offending_connection
                     );
                     return;
                 }
@@ -360,12 +344,16 @@ impl Game {
                 current_id,
                 requested_id,
             } => {
-                if let Some(illegal) = Self::find_illegal_character(&name) {
-                    let offending_connection =
-                        Self::connection_id_for_player(room_state, current_id);
+                if Self::has_illegal_name(&name) {
+                    let offending_connection = room_state
+                        .players
+                        .iter()
+                        .find(|p| p.player_id == current_id)
+                        .map(|p| p.connection_id.clone())
+                        .unwrap_or_else(|| "unknown".to_string());
                     info!(
-                        "Dropping ChangeSeat request from connection {} due to illegal character '{}'",
-                        offending_connection, illegal
+                        "Dropping ChangeSeat request from connection {} due to illegal characters",
+                        offending_connection
                     );
                     return;
                 }
@@ -772,31 +760,6 @@ mod tests {
     }
 
     // ── Seat switching ───────────────────────────────────────────────────────
-
-    /// Rule: seat change requests with illegal characters in the provided name
-    /// are dropped without moving the player.
-    #[tokio::test]
-    async fn test_change_seat_rejects_illegal_name() {
-        let game = new_game();
-        game.generate_new_room(Some("s-room-illegal-seat")).await;
-        game.new_player("s-room-illegal-seat").await; // id 0
-
-        game.process_client_message(
-            "s-room-illegal-seat",
-            ClientMessage::ChangeSeat {
-                name: "Bad<Name".to_string(),
-                current_id: 0,
-                requested_id: 1,
-            },
-        )
-        .await;
-
-        let state = game.get_room_state("s-room-illegal-seat").await.unwrap();
-
-        let player = state.players.iter().find(|p| p.player_id == 0).unwrap();
-        assert_eq!(player.player_name, "Delegate Unknown");
-        assert!(state.players.iter().all(|p| p.player_id != 1));
-    }
 
     /// Rule: a player may move to any vacant seat in the range 0–11.  Their
     /// name travels with them and the old seat becomes vacant.

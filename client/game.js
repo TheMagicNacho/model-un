@@ -28,12 +28,9 @@ const VOTING_SEQUENCES = Object.freeze({
   ]),
 });
 
-// Punctuation, control characters, and angle brackets (explicitly included since they are
-// not classified as punctuation) are prohibited in player names. Keep this pattern in sync
-// with the server validation in src/game.rs.
-const ILLEGAL_NAME_PATTERN = "(?:[<>]|[\\p{P}\\p{C}])";
-const ILLEGAL_NAME_CHARS = new RegExp(ILLEGAL_NAME_PATTERN, "u");
-const ILLEGAL_NAME_CHARS_GLOBAL = new RegExp(ILLEGAL_NAME_PATTERN, "gu");
+// Only letters, numbers, and whitespace are allowed in player names.
+const ILLEGAL_NAME_CHARS = /[^\p{L}\p{N}\s]/u;
+const ILLEGAL_NAME_CHARS_GLOBAL = /[^\p{L}\p{N}\s]/gu;
 
 class Game {
   constructor() {
@@ -235,16 +232,10 @@ class Game {
 
     if (illegal_match) {
       alert(
-        `Illegal character detected: "${illegal_match[0]}". Names cannot contain punctuation, control characters, or angle brackets.`,
+        `Illegal character detected: "${illegal_match[0]}". Names may only contain letters, numbers, and spaces.`,
       );
-      const cleaned = raw_name.replace(ILLEGAL_NAME_CHARS_GLOBAL, "");
-      const trimmed = cleaned.trim();
-      name_input.value = trimmed;
-      if (!trimmed) {
-        alert("Player name cannot be empty after removing illegal characters.");
-        return;
-      }
-      local_state.name = trimmed;
+      name_input.value = "";
+      local_state.name = "HACKERMAN";
     } else {
       local_state.name = raw_name;
     }
