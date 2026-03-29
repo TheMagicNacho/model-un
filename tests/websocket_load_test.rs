@@ -185,7 +185,7 @@ async fn drain_final_state(
 fn assert_room_state_homogeneity(states: &[GameState], room: &str, expected_player_count: usize) {
     assert!(!states.is_empty(), "No states collected for room {room}");
 
-    let reference = &istates[0];
+    let reference = &states[0];
     let mut ref_ids: Vec<usize> = reference.players.iter().map(|p| p.player_id).collect();
     ref_ids.sort();
 
@@ -263,15 +263,20 @@ async fn test_minimum_24_concurrent_connections() {
     }
 
     // Phase 2 + 3: Run activity, then barrier + drain.
-    // The barrier keeps every connection alive until ALL
-    // clients have finished activity so that no player is
-    // removed from the room before the state snapshot.
+    // Two barriers are used:
+    //   barrier  – ensures all activity finishes before any drain starts.
+    //   barrier2 – ensures all drains finish before any connection is dropped.
+    //              Without this, the first task to return drops its WebSocket,
+    //              the server broadcasts an "N-1 players" state, and tasks
+    //              still in their drain window collect that stale state.
     let barrier = Arc::new(Barrier::new(total_clients));
+    let barrier2 = Arc::new(Barrier::new(total_clients));
     let mut handles: Vec<JoinHandle<(bool, Option<GameState>, String)>> =
         Vec::with_capacity(total_clients);
 
     for (ws, pid, room) in connections {
         let b = barrier.clone();
+        let b2 = barrier2.clone();
         let handle = tokio::spawn(async move {
             let mut ws = ws;
             let vote_values: &[u8] = &[1, 2, 3, 5, 8, 13, 21];
@@ -282,6 +287,11 @@ async fn test_minimum_24_concurrent_connections() {
             // before draining the final state.
             b.wait().await;
             let final_state = drain_final_state(&mut ws).await;
+
+            // Hold the connection open until every peer has
+            // collected its snapshot, preventing early-disconnect
+            // broadcasts from contaminating others' final state.
+            b2.wait().await;
 
             (ok, final_state, room)
         });
