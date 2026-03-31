@@ -26,6 +26,10 @@ const VOTING_SEQUENCES = Object.freeze({
     { value: 3, label: "L" },
     { value: 4, label: "XL" },
   ]),
+  YeaNea: Object.freeze([
+    { value: 1, label: "Yea" },
+    { value: 2, label: "Nea" },
+  ]),
 });
 
 // Only letters, numbers, and whitespace are allowed in player names.

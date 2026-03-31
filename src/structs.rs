@@ -24,6 +24,7 @@ pub enum VotingSequence {
     Fibonacci,
     Linear,
     SmMedLgXl,
+    YeaNea,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
