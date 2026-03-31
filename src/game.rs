@@ -1071,17 +1071,17 @@ mod tests {
         let state = game.get_room_state("m-room-cs").await.unwrap();
         assert_eq!(state.voting_sequence, VotingSequence::SmMedLgXl);
 
-        // Captain changes to YeaNea
+        // Captain changes to YeaNay
         game.process_client_message(
             "m-room-cs",
             ClientMessage::ChangeSequence {
                 player_id: 0,
-                sequence: VotingSequence::YeaNea,
+                sequence: VotingSequence::YeaNay,
             },
         )
         .await;
         let state = game.get_room_state("m-room-cs").await.unwrap();
-        assert_eq!(state.voting_sequence, VotingSequence::YeaNea);
+        assert_eq!(state.voting_sequence, VotingSequence::YeaNay);
     }
 
     /// Rule: captainship transfers when a player moves to a higher-numbered
