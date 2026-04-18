@@ -274,6 +274,75 @@ impl Game {
             .await
     }
 
+    async fn player_id_for_connection(&self, room: &str, connection_id: &str) -> Option<usize> {
+        let state = self.game_state.read().await;
+        state.get(room).and_then(|room_state| {
+            room_state
+                .players
+                .iter()
+                .find(|p| p.connection_id == connection_id)
+                .map(|p| p.player_id)
+        })
+    }
+
+    pub async fn process_client_message_for_connection(
+        &self,
+        room: &str,
+        connection_id: &str,
+        message: ClientMessage,
+    ) {
+        let resolved_player_id = self.player_id_for_connection(room, connection_id).await;
+        let message = match message {
+            ClientMessage::ChangeValue { value, .. } => {
+                if let Some(player_id) = resolved_player_id {
+                    ClientMessage::ChangeValue { player_id, value }
+                } else {
+                    return;
+                }
+            }
+            ClientMessage::ChangeName { name, .. } => {
+                if let Some(player_id) = resolved_player_id {
+                    ClientMessage::ChangeName { player_id, name }
+                } else {
+                    return;
+                }
+            }
+            ClientMessage::ChangeSequence { sequence, .. } => {
+                if let Some(player_id) = resolved_player_id {
+                    ClientMessage::ChangeSequence {
+                        player_id,
+                        sequence,
+                    }
+                } else {
+                    return;
+                }
+            }
+            ClientMessage::Pong { .. } => {
+                if let Some(player_id) = resolved_player_id {
+                    ClientMessage::Pong { player_id }
+                } else {
+                    return;
+                }
+            }
+            ClientMessage::ChangeSeat {
+                name, requested_id, ..
+            } => {
+                if let Some(current_id) = resolved_player_id {
+                    ClientMessage::ChangeSeat {
+                        name,
+                        current_id,
+                        requested_id,
+                    }
+                } else {
+                    return;
+                }
+            }
+            other => other,
+        };
+
+        self.process_client_message(room, message).await;
+    }
+
     /// Process a message received from a client and update the room state.
     pub async fn process_client_message(&self, room: &str, message: ClientMessage) {
         debug!(
@@ -479,6 +548,66 @@ mod tests {
         game.remove_player("p-room-reuse", 1).await;
         // ID 1 is now the lowest vacant slot
         assert_eq!(game.new_player("p-room-reuse").await, 1);
+    }
+
+    /// Rule: after a player moves seats, that same connection must keep
+    /// controlling the moved seat even if a new player later occupies the old
+    /// seat ID.
+    #[tokio::test]
+    async fn test_connection_identity_survives_seat_reassignment() {
+        let game = new_game();
+        game.generate_new_room(Some("p-room-connection-id")).await;
+        assert_eq!(
+            game.new_player_with_connection("p-room-connection-id", "conn-a".to_string())
+                .await,
+            0
+        );
+        assert_eq!(
+            game.new_player_with_connection("p-room-connection-id", "conn-b".to_string())
+                .await,
+            1
+        );
+
+        game.process_client_message_for_connection(
+            "p-room-connection-id",
+            "conn-a",
+            ClientMessage::ChangeSeat {
+                name: "Alice".to_string(),
+                current_id: 0,
+                requested_id: 3,
+            },
+        )
+        .await;
+
+        assert_eq!(
+            game.new_player_with_connection("p-room-connection-id", "conn-c".to_string())
+                .await,
+            0
+        );
+
+        game.process_client_message_for_connection(
+            "p-room-connection-id",
+            "conn-a",
+            ClientMessage::ChangeName {
+                player_id: 0,
+                name: "Alice".to_string(),
+            },
+        )
+        .await;
+
+        let state = game.get_room_state("p-room-connection-id").await.unwrap();
+        assert!(
+            state
+                .players
+                .iter()
+                .any(|p| p.player_id == 3 && p.player_name == "Alice")
+        );
+        assert!(
+            state
+                .players
+                .iter()
+                .any(|p| p.player_id == 0 && p.player_name == "Delegate Unknown")
+        );
     }
 
     /// Rule: once all 12 active seats are filled, additional players are placed

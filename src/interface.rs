@@ -107,7 +107,13 @@ impl GameWebSocket {
                                     serde_json::from_str::<ClientMessage>(text)
                             {
                                 debug!("Client Message: {:?}", client_message);
-                                game_state.process_client_message(&room, client_message).await;
+                                game_state
+                                    .process_client_message_for_connection(
+                                        &room,
+                                        &connection_id,
+                                        client_message,
+                                    )
+                                    .await;
                                 if let Some(room_state) = game_state.get_room_state(&room).await {
                                     let _ = tx.send(RoomUpdate {
                                         room: room.to_string(),
