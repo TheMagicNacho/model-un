@@ -293,51 +293,46 @@ impl Game {
     ) {
         let resolved_player_id = self.player_id_for_connection(room, connection_id).await;
         let message = match message {
+            ClientMessage::RevealNumbers { value } => ClientMessage::RevealNumbers { value },
             ClientMessage::ChangeValue { value, .. } => {
-                if let Some(player_id) = resolved_player_id {
-                    ClientMessage::ChangeValue { player_id, value }
-                } else {
+                let Some(player_id) = resolved_player_id else {
                     return;
-                }
+                };
+                ClientMessage::ChangeValue { player_id, value }
             }
             ClientMessage::ChangeName { name, .. } => {
-                if let Some(player_id) = resolved_player_id {
-                    ClientMessage::ChangeName { player_id, name }
-                } else {
+                let Some(player_id) = resolved_player_id else {
                     return;
-                }
+                };
+                ClientMessage::ChangeName { player_id, name }
             }
             ClientMessage::ChangeSequence { sequence, .. } => {
-                if let Some(player_id) = resolved_player_id {
-                    ClientMessage::ChangeSequence {
-                        player_id,
-                        sequence,
-                    }
-                } else {
+                let Some(player_id) = resolved_player_id else {
                     return;
+                };
+                ClientMessage::ChangeSequence {
+                    player_id,
+                    sequence,
                 }
             }
             ClientMessage::Pong { .. } => {
-                if let Some(player_id) = resolved_player_id {
-                    ClientMessage::Pong { player_id }
-                } else {
+                let Some(player_id) = resolved_player_id else {
                     return;
-                }
+                };
+                ClientMessage::Pong { player_id }
             }
             ClientMessage::ChangeSeat {
                 name, requested_id, ..
             } => {
-                if let Some(current_id) = resolved_player_id {
-                    ClientMessage::ChangeSeat {
-                        name,
-                        current_id,
-                        requested_id,
-                    }
-                } else {
+                let Some(current_id) = resolved_player_id else {
                     return;
+                };
+                ClientMessage::ChangeSeat {
+                    name,
+                    current_id,
+                    requested_id,
                 }
             }
-            other => other,
         };
 
         self.process_client_message(room, message).await;
